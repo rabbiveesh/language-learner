@@ -11,9 +11,8 @@ has dom =>  (
 );
 
 sub language ($self, $lang) {
-  my $first = $self->dom->find("h2 span#$lang")->first;
-  $first->parent->following_nodes
-        ->join('')
+  my $start = $self->dom->find("h2 span#$lang")->first->parent;
+  join '', $start, $start->following_nodes->to_array->@*
 
 }
 
