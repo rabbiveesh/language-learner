@@ -5,11 +5,14 @@ use warnings;
 
 our $VERSION = '0.001';
 
+use Language::Learner::Wiktionary;
+
 1;
 
+#TODO- write POD
 =head1 NAME
 
-Language::Learner - Module abstract placeholder text
+Language::Learner - For help with learning languages
 
 =head1 SYNOPSIS
 
