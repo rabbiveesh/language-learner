@@ -12,8 +12,17 @@ has dom =>  (
 
 sub language ($self, $lang) {
   my $start = $self->dom->find("h2 span#$lang")->first->parent;
-  join '', $start, $start->following_nodes->to_array->@*
+  my $for_lang = $start->following_nodes;
+  unshift @$for_lang, $start;
 
+  my $hr_found;
+  $for_lang = $for_lang->map( sub {
+    $hr_found++ if $_->matches('hr');
+    return () if $hr_found;
+    $_;
+  });
+
+  $for_lang->join('')
 }
 
 
