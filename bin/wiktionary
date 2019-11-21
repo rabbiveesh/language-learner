@@ -8,11 +8,9 @@ use Mojo::Util qw/getopt/;
 getopt
   'l|language=s' => \my $lang;
 
-my $wiki = Language::Learner::Wiktionary->new;
 my $ua = Mojo::UserAgent->new;
 for my $word (@ARGV) {
-   my $dom = $ua->get("https://en.wiktionary.org/wiki/$word")->tx->res->dom;
-   $wiki->dom($dom);
-   $wiki->language($lang || 'Portuguese');
+   my $dom = $ua->get("https://en.wiktionary.org/wiki/$word")->res->dom;
+   my $wiki = Language::Learner::Wiktionary->new( dom => $dom, language => $lang || 'Portuguese' );
    say $wiki->plaintext;
 }
