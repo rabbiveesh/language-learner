@@ -11,7 +11,7 @@ sub import {
   #Language::Leaner::Common::Exports->import::into($target);
   strict->import::into($target);
   warnings->import::into($target);
-  feature->import::into($target, qw/:5.22 postderef postderef_qq signatures/);
+  feature->import::into($target, qw/:5.20 postderef postderef_qq signatures/);
   warnings->unimport::out_of($target, qw/experimental::postderef experimental::signatures/);
 }
 
