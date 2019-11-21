@@ -2,6 +2,7 @@ package Language::Learner::Wiktionary;
 
 use Language::Learner::Class;
 use Mojo::DOM;
+use Pandoc;
 
 has dom =>  (
   is => 'rw',
@@ -10,7 +11,19 @@ has dom =>  (
   required => 1
 );
 
-sub language ($self, $lang) {
+has language => (
+  is => 'rw',
+  isa => Str,
+  trigger => 1
+);
+
+has result => (
+  is => 'rw',
+  isa => MojoStr,
+  coerce => 1
+);
+
+sub _trigger_language ($self, $lang) {
   my $start = $self->dom->find("h2 span#$lang")->first->parent;
   my $for_lang = $start->following_nodes;
   unshift @$for_lang, $start;
@@ -22,8 +35,13 @@ sub language ($self, $lang) {
     $_;
   });
 
-  $for_lang->join('')
+  $self->result( $for_lang->join('') || 'nothing found' )
 }
 
+sub plaintext ($self) {
+  my $html = $self->result;
+  pandoc -f => 'html', -t => 'plain', { in => \$html, out => \my $md };
+  $md
+}
 
 9001;
