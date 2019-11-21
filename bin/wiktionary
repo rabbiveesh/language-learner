@@ -1,0 +1,18 @@
+#!/usr/bin/env perl
+
+use Language::Learner::Common;
+use Language::Learner::Wiktionary;
+use Mojo::UserAgent;
+use Mojo::Util qw/getopt/;
+
+getopt
+  'l|language=s' => \my $lang;
+
+my $wiki = Language::Learner::Wiktionary->new;
+my $ua = Mojo::UserAgent->new;
+for my $word (@ARGV) {
+   my $dom = $ua->get("https://en.wiktionary.org/wiki/$word")->tx->res->dom;
+   $wiki->dom($dom);
+   $wiki->language($lang || 'Portuguese');
+   say $wiki->plaintext;
+}

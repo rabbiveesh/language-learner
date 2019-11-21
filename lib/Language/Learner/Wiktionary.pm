@@ -8,13 +8,14 @@ has dom =>  (
   is => 'rw',
   isa => DOM,
   coerce => 1,
-  required => 1
+  required => 1,
+  trigger => \&build_result
 );
 
 has language => (
   is => 'rw',
   isa => Str,
-  trigger => 1
+  trigger => \&build_result
 );
 
 has result => (
@@ -23,7 +24,8 @@ has result => (
   coerce => 1
 );
 
-sub _trigger_language ($self, $lang) {
+sub build_result ($self, $lang) {
+  return unless $self->language;
   my $start = $self->dom->find("h2 span#$lang")->first->parent;
   my $for_lang = $start->following_nodes;
   unshift @$for_lang, $start;
