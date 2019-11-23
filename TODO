@@ -1,0 +1,6 @@
+add in our reverso scraper as a tool
+
+also make a Tool namespace.
+
+And I guess have everything in some neutral format, so we can have
+output Tools too?
