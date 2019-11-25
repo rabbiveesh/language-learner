@@ -1,0 +1,18 @@
+#! /usr/bin/env perl
+
+use Language::Learner::Common;
+use Mojo::UserAgent;
+use Mojo::File qw/path/;
+
+my $ua = Mojo::UserAgent->new( max_redirects => 5 );
+
+use Pry;
+for my $word (@ARGV) {
+  my $res = $ua->get("https://www.google.com.br/search?tbm=isch&hl=pt-BR&q=$word")->res;
+  my $table = $res->dom->find('td img')->map('parent')
+    ->map( sub { $_->wrap_content('<div></div>') });
+
+  path("$word.html")->spurt($table->map('to_string')->join(''))
+
+}
+
