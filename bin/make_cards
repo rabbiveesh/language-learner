@@ -11,14 +11,23 @@ die 'file already exists' if path($fname)->stat;
 my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
 my @rows;
 $sheet->addrow(qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
+
+my %words;
+
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)
     ->map(qw/basename .mp3/)
+    ->map( sub {
+        @words{split / /, $_} = 1;
+        return $_
+      })
     ->map(sub { decode 'UTF-8', $_ } )
     ->map( sub {
-      push @rows, [ $_, undef, "$_.mp3" ]
-    });
+      push @rows, [ $_, undef, "$_.mp3" ];
+      return $_ });
 
+use Data::Printer;
+p %words;
 
 $sheet->addrow($_->@*) for @rows;
 $sheet->close;
