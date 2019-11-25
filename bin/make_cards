@@ -2,16 +2,19 @@
 
 use Language::Learner::Common;
 use Mojo::File qw/path/;
+use Mojo::Util qw/decode/;
 use Spreadsheet::Write;
 
 my $fname = 'cards.csv';
 die 'file already exists' if path($fname)->stat;
 
-my $sheet = Spreadsheet::Write->new(file => $fname);
+my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
 my @rows;
-$sheet->addrow(qw/ Spelling Image Audio Extra/ 'Part of Speech', 'IPA');
+$sheet->addrow(qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
 say 'generating basic cards';
-path->list->map(qw/basename .mp3/)
+path->list->grep(qr/mp3$/)
+    ->map(qw/basename .mp3/)
+    ->map(sub { decode 'UTF-8', $_ } )
     ->map( sub {
       push @rows, [ $_, undef, "$_.mp3" ]
     });
