@@ -1,0 +1,21 @@
+#! /usr/bin/env perl
+
+use Language::Learner::Common;
+use Mojo::File qw/path/;
+use Spreadsheet::Write;
+
+my $fname = 'cards.csv';
+die 'file already exists' if path($fname)->stat;
+
+my $sheet = Spreadsheet::Write->new(file => $fname);
+my @rows;
+$sheet->addrow(qw/ Spelling Image Audio Extra/ 'Part of Speech', 'IPA');
+say 'generating basic cards';
+path->list->map(qw/basename .mp3/)
+    ->map( sub {
+      push @rows, [ $_, undef, "$_.mp3" ]
+    });
+
+
+$sheet->addrow($_->@*) for @rows;
+$sheet->close;
