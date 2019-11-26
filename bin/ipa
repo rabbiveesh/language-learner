@@ -1,0 +1,16 @@
+#!/usr/bin/env perl
+
+use Language::Learner::Common;
+use Language::Learner::Wiktionary;
+use Mojo::UserAgent;
+use Mojo::Util qw/getopt/;
+
+getopt
+  'l|language=s' => \my $lang;
+
+my $ua = Mojo::UserAgent->new;
+for my $word (@ARGV) {
+   my $dom = $ua->get("https://en.wiktionary.org/wiki/$word")->res->dom;
+   my $wiki = Language::Learner::Wiktionary->new( dom => $dom, language => $lang || 'Portuguese' );
+   say grep { /IPA/ } split /\n/, $wiki->plaintext;
+}
