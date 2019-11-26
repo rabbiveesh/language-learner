@@ -8,9 +8,27 @@ use Mojo::Util qw/getopt/;
 getopt
   'l|language=s' => \my $lang;
 
+
 my $ua = Mojo::UserAgent->new;
+my @promises;
+
 for my $word (@ARGV) {
-   my $dom = $ua->get("https://en.wiktionary.org/wiki/$word")->res->dom;
-   my $wiki = Language::Learner::Wiktionary->new( dom => $dom, language => $lang || 'Portuguese' );
-   say grep { /IPA/ } split /\n/, $wiki->plaintext;
+   push @promises, $ua->get_p("https://en.wiktionary.org/wiki/$word")
+   ->then(sub ($tx) {
+     my $res = $tx->res;
+     my $word = pop $tx->req->url->path->parts->@*;
+     my $wiki = Language::Learner::Wiktionary->new( dom => $res->dom, language => $lang || 'Portuguese' );
+     say "IPA results for $word";
+     try {
+       say for grep { /IPA/ } split /\n/, $wiki->plaintext;
+     } catch {
+       say 'no results found'
+     }
+   })->catch( sub { say @_ } );
 }
+
+use Mojo::Promise;
+Mojo::Promise->all(@promises)->wait;
+
+
+
