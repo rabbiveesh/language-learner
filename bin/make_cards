@@ -22,8 +22,6 @@ use Parse::CSV;
 my (@ipa_rows, $ipa_row);
 my $ipa_sheet = Parse::CSV->new(file => '/home/veesh/Desktop/Portuguese/aeiouado-ipa-01.csv', sep_char => "\t");
 
-push @ipa_rows, $ipa_row while $ipa_row = $ipa_sheet->fetch;
-my $ipa = { map { $_->@* } @ipa_rows };
 
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)
@@ -39,11 +37,8 @@ path->list->grep(qr/mp3$/)
         $_, 
         qq(<img src="${\$images->first(qr/$word/)}">),
         "[sound:$_.mp3]",
-        $ipa->{$word},
       ];
       return $_ });
-
-p %words;
 
 my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
 $sheet->addrow(qw/ Spelling Image Audio IPA Extra/, 'Part of Speech');
