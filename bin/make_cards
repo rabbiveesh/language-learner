@@ -5,14 +5,25 @@ use Mojo::File qw/path/;
 use Mojo::Util qw/decode/;
 use Spreadsheet::Write;
 
+use Data::Printer;
+
 my $fname = 'cards.csv';
 die 'file already exists' if path($fname)->stat;
 
-my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
 my @rows;
-$sheet->addrow(qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
 
 my %words;
+
+my $images = path->list
+               ->grep(qr/(jpeg|png)$/)
+               ->map('basename');
+
+use Parse::CSV;
+my (@ipa_rows, $ipa_row);
+my $ipa_sheet = Parse::CSV->new(file => '/home/veesh/Desktop/Portuguese/aeiouado-ipa-01.csv', sep_char => "\t");
+
+push @ipa_rows, $ipa_row while $ipa_row = $ipa_sheet->fetch;
+my $ipa = { map { $_->@* } @ipa_rows };
 
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)
@@ -21,13 +32,21 @@ path->list->grep(qr/mp3$/)
         @words{split / /, $_} = 1;
         return $_
       })
-    ->map(sub { decode 'UTF-8', $_ } )
     ->map( sub {
-      push @rows, [ $_, undef, "$_.mp3" ];
+      my $word = $_;
+      $_ = decode 'UTF-8', $_;
+      push @rows, [ 
+        $_, 
+        qq(<img src="${\$images->first(qr/$word/)}">),
+        "[sound:$_.mp3]",
+        $ipa->{$word},
+      ];
       return $_ });
 
-use Data::Printer;
 p %words;
+
+my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
+$sheet->addrow(qw/ Spelling Image Audio IPA Extra/, 'Part of Speech');
 
 $sheet->addrow($_->@*) for @rows;
 $sheet->close;
