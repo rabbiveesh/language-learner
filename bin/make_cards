@@ -33,15 +33,26 @@ path->list->grep(qr/mp3$/)
     ->map( sub {
       my $word = $_;
       $_ = decode 'UTF-8', $_;
-      push @rows, [ 
-        $_, 
-        qq(<img src="${\$images->first(qr/$word/)}">),
-        "[sound:$_.mp3]",
-      ];
-      return $_ });
+      push @rows, { 
+        Spelling => $_, 
+        Image => qq(<img src="${\$images->first(qr/$word/)}">),
+        Audio => "[sound:$_.mp3]",
+      };
+      return $word
+    });
 
+#TODO- make this configurable on install
+my $collection = path(
+  '/home/veesh/.local/share/Anki2/Veesh/collection.media/'
+);
+
+say 'copying the media';
+path->list->map( sub { 
+  $_->copy_to( $collection->child($_->basename)->to_string )
+});
+
+say 'writing the file';
 my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
-$sheet->addrow(qw/ Spelling Image Audio IPA Extra/, 'Part of Speech');
-
-$sheet->addrow($_->@*) for @rows;
+my @fields = (qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
+$sheet->addrow($_->@{@fields}) for @rows;
 $sheet->close;
