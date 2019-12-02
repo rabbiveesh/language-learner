@@ -2,11 +2,19 @@
 
 use Language::Learner::Common;
 use Mojo::File qw/path/;
-use Mojo::Util qw/decode/;
+use Mojo::Util qw/decode trim/;
+use Mojo::UserAgent;
+use Mojo::Promise;
+my $ua = Mojo::UserAgent->new->max_redirects(5);
+
 use Spreadsheet::Write;
+
+use Language::Learner::GoogleTranslate;
 
 use Data::Printer;
 
+#check if cards have been made already
+#TODO- implement a flag to skip this check
 my $fname = 'cards.csv';
 die 'file already exists' if path($fname)->stat;
 
@@ -14,14 +22,41 @@ my @rows;
 
 my %words;
 
+#TODO- next version won't have images at the start
 my $images = path->list
                ->grep(qr/(jpeg|png)$/)
                ->map('basename');
 
-use Parse::CSV;
-my (@ipa_rows, $ipa_row);
-my $ipa_sheet = Parse::CSV->new(file => '/home/veesh/Desktop/Portuguese/aeiouado-ipa-01.csv', sep_char => "\t");
+say 'splitting filenames';
+my $files = path->list->grep(qr/mp3$/);
+my $fnames = $files->map('basename', '.mp3')
+   ->map(sub {
+     [map { trim $_ } split /-/, $_]
+   });
 
+my $pt = $fnames->map(sub { $_->[1] } );
+my $en = $fnames->map(sub { $_->[0] } );
+
+say 'spell checking';
+my $spellcheck = Language::Learner::GoogleTranslate->new;
+my @promises;
+$pt = $pt->map( sub {
+  my $word = $_;
+  push @promises, $ua->get_p( $spellcheck->query_for($word) )
+     ->then( sub ($tx) {
+       try {
+         $spellcheck->parse_response($tx->res)->{corrections}->@*
+       } catch {
+         $word
+       }
+      })
+});
+Mojo::Promise->all(@promises);
+
+#TODO-
+#implement spell checking, implement ipa lookup, implement image
+#lookup in both languages, implement parsing filenames with both
+#languages, implement POS lookup
 
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)

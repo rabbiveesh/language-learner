@@ -27,3 +27,37 @@ has language => (
   default => 'pt_BR'
 );
 
+has options => (
+  is => 'rw',
+  isa => ArrayRef,
+  default => sub { [ qw/ corrections /] },
+);
+
+
+sub query_for ($self, $word) {
+  $base_url->clone->query(
+    client => 'gtx',
+    ( map { ( dt => $parts{$_} ) } $self->options->@* ),
+    sl => $self->language, tl => 'en', q => $word );
+}
+
+sub parse_response ($self, $res) {
+#TODO- do the thing!
+
+
+}
+
+sub spell_check ($self, $res, $target) {
+#TODO- imlement here
+
+
+}
+
+
+
+
+
+
+
+9991
+
