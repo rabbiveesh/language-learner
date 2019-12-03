@@ -51,6 +51,8 @@ $pt = $pt->map( sub {
        }
       })
 });
+#TODO- implement the after logic here. Make a new mojo collection
+#with our spell checked results. maybe ask for user interaction?
 Mojo::Promise->all(@promises);
 
 #TODO-

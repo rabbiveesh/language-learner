@@ -1,4 +1,4 @@
-package Lanugage::Learner::GoogleTranslate;
+package Language::Learner::GoogleTranslate;
 use Language::Learner::Class;
 use Mojo::URL;
 
@@ -8,7 +8,7 @@ my $base_url = Mojo::URL->new('https://translate.google.com/translate_a/single')
 #apparently, the dt option controls what gets returned by the
 #query
 
-my %parts = my @ ( 
+my %parts = ( 
   translation      => 't',   #first field
   dictionary       => 'bd',  #second field
                              #3rd is translated language, for auto
@@ -38,11 +38,14 @@ sub query_for ($self, $word) {
   $base_url->clone->query(
     client => 'gtx',
     ( map { ( dt => $parts{$_} ) } $self->options->@* ),
-    sl => $self->language, tl => 'en', q => $word );
+    sl => $self->language, tl => 'en', oe => 'utf-8', q => $word );
 }
 
 sub parse_response ($self, $res) {
-#TODO- do the thing!
+  #TODO- see why json is losing the e char
+
+  my $json = $res->json;
+  my $ret = { corrections => $json->[7][1] }
 
 
 }
