@@ -71,10 +71,10 @@ sub spell_check ($self, @targets) {
   Mojo::Promise->all(@promises)
     ->then(sub (@results) {
         @results = map { $_->[0]{corrections} } @results;
-        %corrected = 
-          ( zip @targets, @results );
-        })->wait;
+        %corrected = ( zip @targets, @results );
+      })->wait;
 
+  $corrected{$_} ||= $_ for keys %corrected;
   if (@targets == 1) {
     return (values %corrected)[0]
   }

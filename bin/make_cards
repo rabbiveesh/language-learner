@@ -38,27 +38,15 @@ my $pt = $fnames->map(sub { $_->[1] } );
 my $en = $fnames->map(sub { $_->[0] } );
 
 say 'spell checking';
-my $spellcheck = Language::Learner::GoogleTranslate->new;
-my @promises;
-$pt = $pt->map( sub {
-  my $word = $_;
-  push @promises, $ua->get_p( $spellcheck->query_for($word) )
-     ->then( sub ($tx) {
-       try {
-         $spellcheck->parse_response($tx->res)->{corrections}->@*
-       } catch {
-         $word
-       }
-      })
-});
-#TODO- implement the after logic here. Make a new mojo collection
-#with our spell checked results. maybe ask for user interaction?
-Mojo::Promise->all(@promises);
+my $gt = Language::Learner::GoogleTranslate->new;
+my $corrections = $gt->spell_check($pt->to_array->@*);
+$pt = $pt->map( sub { $corrections->{$_} } );
+#TODO- rename all the files with spell correctedness
 
-#TODO-
-#implement spell checking, implement ipa lookup, implement image
-#lookup in both languages, implement parsing filenames with both
-#languages, implement POS lookup
+die;
+#TODO- implement image lookup in both languages, implement POS lookup
+say 'retrieving ipa';
+#TODO- get all ipa sheets as promises, and then
 
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)

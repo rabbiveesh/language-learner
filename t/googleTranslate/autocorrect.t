@@ -14,6 +14,13 @@ is $gt->spell_check('ceu', 'mae'),
     mae => 'mãe' },
   'does multi correct also';
 
+is $gt->spell_check('nos'), 'nos',
+  'returns correctly spelled st00f';
+
+is $gt->spell_check('nos', 'ceu'),
+  { ceu => 'céu',
+    nos => 'nos' },
+  'mix list fully returns';
 
 
 
