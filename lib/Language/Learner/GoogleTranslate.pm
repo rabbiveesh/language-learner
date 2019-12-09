@@ -49,13 +49,14 @@ sub query_for ($self, $word) {
 
 sub _make_request ($self, $word) {
   $ua->get_p($self->query_for($word))
-     ->catch(sub { warn "lookup for $word failed: ", @_ , "\n" } )
      ->then(sub ($tx) { $self->_parse_response($tx->res) } )
+     ->catch(sub { warn "lookup for $word failed: ", @_ , "\n" } )
      
 
 }
 
 sub _parse_response ($self, $res) {
+  die join ' - ', $res->error->@{qw/code message/} if $res->error;
   my $json = $res->json;
   my $ret = { corrections => $json->[7][1] }
 }
@@ -69,6 +70,7 @@ sub spell_check ($self, @targets) {
   }
   my %corrected;
   Mojo::Promise->all(@promises)
+    ->catch(sub { die "horrible death!: @_" } )
     ->then(sub (@results) {
         @results = map { $_->[0]{corrections} } @results;
         %corrected = ( zip @targets, @results );
