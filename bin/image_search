@@ -14,10 +14,11 @@ for my $word (@ARGV) {
     ->map( sub { $_->wrap_content('<div></div>') });
   shift $table->@*;
 
-  #TODO- add .col and stuff and use flexbox
-  path("$word.html")->spurt(encode 'UTF-8', '<div style="display: flex;flex-direction: row;flex-wrap: wrap">' 
-    . $table->map('to_string')->join('')
-    . '</div>'
+  path("$word.html")->spurt(
+    $res->body
+    #encode 'UTF-8', '<div style="display: flex;flex-direction: row;flex-wrap: wrap">' 
+    #. $table->map('to_string')->join('')
+    #. '</div>'
   )
 
 }

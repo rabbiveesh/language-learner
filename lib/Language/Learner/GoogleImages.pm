@@ -25,7 +25,14 @@ sub get_images ($self, $options, @words) {
   my @promises;
   for my $word (@words) {
     my $query = $base_url->clone->query(tbm => 'isch', hl => $self->language, q => $word);
-    push @promises, $ua->get_p($query)
+    push @promises, $ua->get_p($query)->then(
+      sub ($tx) {
+        my $dom = $tx->result->dom;  
+        return $dom->find("img[alt*=$word]")
+          ->map(sub { $_->parent->parent  }) #get the td
+          ->map( sub { $_->at('a')->replace( $_->at('img') ) } )
+    })
+  ->catch(sub { die "horrible death!: @_" } )
   }
 
   return Mojo::Promise->all(@promises)->then(sub { map { $_->[0]->res } @_ } )
