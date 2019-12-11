@@ -1,25 +1,19 @@
 #! /usr/bin/env perl
 
 use Language::Learner::Common;
-use Mojo::UserAgent;
+use Language::Learner::GoogleImages;
 use Mojo::File qw/path/;
 use Mojo::Util qw/encode/;
 
-my $ua = Mojo::UserAgent->new( max_redirects => 5 );
 
 use Pry;
-for my $word (@ARGV) {
-  my $res = $ua->get("https://www.google.com/search?tbm=isch&hl=pt-BR&q=$word")->res;
-  my $table = $res->dom->find('td img')->map('parent')
-    ->map( sub { $_->wrap_content('<div></div>') });
-  shift $table->@*;
+my $g_images_pt = Language::Learner::GoogleImages->new;
+my $g_images_en = Language::Learner::GoogleImages->new( language => 'en' );
 
-  path("$word.html")->spurt(
-    $res->body
-    #encode 'UTF-8', '<div style="display: flex;flex-direction: row;flex-wrap: wrap">' 
-    #. $table->map('to_string')->join('')
-    #. '</div>'
-  )
+my $images;
+$g_images_pt->get_images(@ARGV)->then( sub {
+  $images = shift;
+})->wait;
 
-}
+pry;
 
