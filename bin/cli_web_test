@@ -1,0 +1,19 @@
+#!/usr/bin/env perl
+use Mojolicious::Lite;
+use Mojo::IOLoop;
+
+
+get '/' => sub { shift->render(text => 'hi') };
+get '/exit' => sub {
+  shift->render(text => 'shutting down'); 
+  Mojo::IOLoop->timer(1, sub { Mojo::IOLoop->stop} ); };
+
+app->hook(before_server_start => sub {
+  shift->silent(1)
+});
+
+app->start('daemon');
+
+app->log->debug('hi');
+
+app->start('daemon');

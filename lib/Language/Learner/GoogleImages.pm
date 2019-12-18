@@ -28,6 +28,7 @@ sub get_images ($self, $options, @words) {
   for my $word (@words) {
     my $query = $base_url->clone
       ->query(tbm => 'isch', hl => $self->language, q => $word);
+    #use start argument for infinite scroll
     push @promises, $ua->get_p($query)->then(
       sub ($tx) {
         my $res = $tx->res;

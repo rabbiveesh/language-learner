@@ -2,7 +2,19 @@ package Language::Learner::Wiktionary;
 
 use Language::Learner::Class;
 use Mojo::DOM;
+use Mojo:URL;
+use Mojo::UserAgent;
 use Pandoc;
+
+my $ua = Mojo::UserAgent->new->max_redirects(5)
+          ->with_roles('+Queued')->max_active(4);
+
+my $base_url = Mojo::URL->new('https://en.wiktionary.org/wiki/');
+
+#TODO- just put this elsewhere
+sub _url_for ($query) {
+  $base_url->clone->path($query)
+}
 
 has dom =>  (
   is => 'rw',
@@ -23,6 +35,8 @@ has result => (
   isa => MojoStr,
   coerce => 1
 );
+
+#TODO- implement grabbing like in other classes here
 
 sub build_result ($self, $lang) {
   return unless $self->language;

@@ -11,6 +11,7 @@ use Spreadsheet::Write;
 use Browser::Open qw/open_browser/;
 
 use Language::Learner::GoogleTranslate;
+use Language::Learner::GoogleImages;
 
 use Data::Printer;
 
@@ -22,11 +23,6 @@ die 'file already exists' if path($fname)->stat;
 my @rows;
 
 my %words;
-
-#TODO- next version won't have images at the start
-my $images = path->list
-               ->grep(qr/(jpeg|png)$/)
-               ->map('basename');
 
 say 'splitting filenames';
 my $files = path->list->grep(qr/mp3$/);
@@ -40,16 +36,17 @@ my $en = $fnames->map(sub { $_->[0] } );
 
 
 say 'spell checking';
+#TODO- replace with Text::Aspell
 my $gt = Language::Learner::GoogleTranslate->new;
 my $corrections = $gt->spell_check($pt->to_array->@*);
 $pt = $pt->map( sub { $corrections->{$_} } );
-#TODO- rename all the files with spell correctedness
 
+#TODO- no reason to rename the files, yet, b/c we may have multiple
+#suggestions
 say 'renaming files';
 $files->each( sub ($item, $index) {
-  #rename $item->to_string,
-  say $item->to_string;
-  say  $item->dirname->child("$pt->[$index - 1].mp3")->to_string
+  rename $item->to_string,
+       $item->sibling("$pt->[$index - 1].mp3")->to_string
 });
 die;
 #TODO- implement image lookup in both languages, implement POS lookup
