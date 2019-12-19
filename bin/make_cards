@@ -1,5 +1,6 @@
 #! /usr/bin/env perl
 
+use utf8;
 use Language::Learner::Common;
 use Mojo::File qw/path/;
 use Mojo::Util qw/encode decode trim slugify/;
@@ -75,13 +76,19 @@ Mojo::Promise->all(@images_p)
   use File::ShareDir qw/dist_dir/;
   use Language::Learner::Common;
 
+  #my $base_url = "http://localhost:${\empty_port}";
+  my $base_url = "http://localhost:9099";
+
+  plugin 'SecureCORS';
+  app->routes->to('cors.origin' => $base_url);
+  app->routes->to('cors.headers' => 'Content-Type, Cache-Control');
 
   push @{app->static->paths},
     path( dist_dir('Language-Learner') )->child('spa'); 
 
   get '/' => sub { shift->reply->static('index.html') };
 
-  get '/words' => sub ($c) {
+  get '/words' => { 'cors.origin' => '*' } => sub ($c) {
     $c->render( json => [ keys %images ] );
   };
 
@@ -93,7 +100,6 @@ Mojo::Promise->all(@images_p)
     $c->render( json => $images{$c->stash('word')} );
   };
 
-  my $base_url = "http://localhost:${\empty_port}";
 
   app->hook( before_server_start => sub ($server, @) {
     $server->silent(1);

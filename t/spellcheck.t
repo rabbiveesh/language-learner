@@ -25,4 +25,12 @@ is $s->check('voce toma agua'),
   'você toma aguá',
   'corrects phrases too';
 
+is my $hash = { $s->check('voce toma agua') , 'hi' },
+   { 'você toma aguá' => 'hi' },
+   'hash keys are normal';
+
+is [ keys $hash->%* ], [ 'você toma aguá' ],
+  'keys returns as expected';
+
+
 done_testing;
