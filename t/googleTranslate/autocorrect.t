@@ -6,7 +6,7 @@ use Language::Learner::GoogleTranslate;
 
 my $gt = Language::Learner::GoogleTranslate->new;
 
-skip_all('Switching off this anyways');
+skip_all('sall good for now');
 
 is $gt->spell_check('ceu'), 'céu',
   'got the corrections';

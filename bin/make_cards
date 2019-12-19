@@ -2,7 +2,7 @@
 
 use Language::Learner::Common;
 use Mojo::File qw/path/;
-use Mojo::Util qw/decode trim/;
+use Mojo::Util qw/decode trim slugify/;
 use Mojo::UserAgent;
 use Mojo::Promise;
 my $ua = Mojo::UserAgent->new->max_redirects(5);
@@ -38,9 +38,28 @@ my $en = $fnames->map(sub { $_->[0] } );
 
 say 'spell checking';
 #TODO- replace with Text::Aspell
-my $gt = Language::Learner::GoogleTranslate->new;
-my $corrections = $gt->spell_check(@$pt);
-$pt = $pt->map( sub { $corrections->{$_} } );
+use Text::Aspell;
+my $spell = Text::Aspell->new;
+$spell->set_option('lang', 'pt_BR');
+$pt = $pt->map( sub {
+  #TODO- break things up into words, check each, and put em back
+  my @words = split ' ', $_;
+  for my $word (@words) {
+    next if $spell->check($_);
+    my @suggests = $spell->suggest($_);
+    @suggests = grep { $word eq slugify $_ } @suggests;
+    next unless @suggests;
+    $word = $suggests[0];
+  }
+  join ' ', @words
+});
+
+p $pt;
+die;
+
+
+#TODO- what the flip is going on with the utf-8?
+
 
 #TODO- no reason to rename the files, yet, b/c we may have multiple
 #suggestions
@@ -73,6 +92,7 @@ Mojo::Promise->all(@images_p)
   use Mojo::File qw/path/;
   use Net::EmptyPort qw/empty_port/;
   use File::ShareDir qw/dist_dir/;
+  use Language::Learner::Common;
 
 
   push @{app->static->paths},
@@ -94,9 +114,8 @@ Mojo::Promise->all(@images_p)
 
   my $base_url = "http://localhost:${\empty_port}";
 
-  #app->log->level('warn');
   app->hook( before_server_start => sub ($server, @) {
-    #$server->silent(1);
+    $server->silent(1);
     system "firefox $base_url > /dev/null 2>&1 &";
   });
   app->start('daemon', '--listen', $base_url, qw/-m production/);
