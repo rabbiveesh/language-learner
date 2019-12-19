@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "eslint --ext .js,.vue src",
     "test": "echo \"No test specified\" && exit 0"
+    "deploy": "quasar build && rm -r ../share/spa/* && cp -r dist/spa/* ../public/"
   },
   "dependencies": {
     "@quasar/extras": "^1.0.0",
