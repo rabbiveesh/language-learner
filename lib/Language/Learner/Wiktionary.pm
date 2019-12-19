@@ -2,7 +2,7 @@ package Language::Learner::Wiktionary;
 
 use Language::Learner::Class;
 use Mojo::DOM;
-use Mojo:URL;
+use Mojo::URL;
 use Mojo::UserAgent;
 use Pandoc;
 

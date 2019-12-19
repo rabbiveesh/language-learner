@@ -7,8 +7,9 @@ use Mojo::UserAgent;
 use Mojo::Promise;
 my $ua = Mojo::UserAgent->new->max_redirects(5);
 
+use List::MoreUtils qw/pairwise/;
+
 use Spreadsheet::Write;
-use Browser::Open qw/open_browser/;
 
 use Language::Learner::GoogleTranslate;
 use Language::Learner::GoogleImages;
@@ -38,21 +39,66 @@ my $en = $fnames->map(sub { $_->[0] } );
 say 'spell checking';
 #TODO- replace with Text::Aspell
 my $gt = Language::Learner::GoogleTranslate->new;
-my $corrections = $gt->spell_check($pt->to_array->@*);
+my $corrections = $gt->spell_check(@$pt);
 $pt = $pt->map( sub { $corrections->{$_} } );
 
 #TODO- no reason to rename the files, yet, b/c we may have multiple
 #suggestions
 say 'renaming files';
-$files->each( sub ($item, $index) {
-  rename $item->to_string,
-       $item->sibling("$pt->[$index - 1].mp3")->to_string
-});
-die;
-#TODO- implement image lookup in both languages, implement POS lookup
-say 'retrieving ipa';
-#TODO- get all ipa sheets as promises, and then
+#$files->each( sub ($item, $index) {
+#  rename $item->to_string,
+#       $item->sibling("$pt->[$index - 1].mp3")->to_string
+#});
 
+my $en_img = Language::Learner::GoogleImages->new(language => 'en');
+my $pt_img = Language::Learner::GoogleImages->new(language => 'pt-BR');
+
+my @images_p;
+push @images_p, $pt_img->get_images(@$pt);
+push @images_p, $en_img->get_images(@$en);
+
+my %images;
+Mojo::Promise->all(@images_p)
+  ->then( sub { map { $_->[0] } @_ } )
+  ->then(sub ($pt_r, $en_r) {
+      %images = pairwise { 
+        ( $a->{word} => [ map { $_->{results}->@* } $a, $b ] )
+      } $pt_r->@*, $en_r->@*;
+  })
+->wait;
+
+{
+  use Mojolicious::Lite;
+  use Mojo::IOLoop;
+  use Mojo::File qw/curfile/;
+  use Net::EmptyPort qw/empty_port/;
+  push @{app->static->paths}, curfile->child('llpublic'); 
+
+  get '/' => sub { shift->reply->static('index.html') };
+
+  get '/words' => sub ($c) {
+    $c->render( json => [ keys %images ] );
+  };
+
+  get '/exit' => sub { 
+    Mojo::IOLoop->timer(.5, sub { Mojo::IOLoop->stop })
+  };
+
+  get '/img/:word' => sub ($c) {
+    $c->render( json => $images{$c->stash('word')} );
+  };
+
+  my $base_url = "http://localhost:${\empty_port}";
+
+  #app->log->level('warn');
+  app->hook( before_server_start => sub ($server, @) {
+    #$server->silent(1);
+    system "firefox $base_url > /dev/null 2>&1 &";
+  });
+  app->start('daemon', '--listen', $base_url, qw/-m production/);
+}
+
+die;
 say 'generating basic cards';
 path->list->grep(qr/mp3$/)
     ->map(qw/basename .mp3/)
@@ -65,7 +111,7 @@ path->list->grep(qr/mp3$/)
       $_ = decode 'UTF-8', $_;
       push @rows, { 
         Spelling => $_, 
-        Image => qq(<img src="${\$images->first(qr/$word/)}">),
+        Image => qq(<img src="$images{$word}[0]">),
         Audio => "[sound:$_.mp3]",
       };
       return $word
