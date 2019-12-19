@@ -80,15 +80,15 @@ Mojo::Promise->all(@images_p)
   my $base_url = "http://localhost:9099";
 
   plugin 'SecureCORS';
-  app->routes->to('cors.origin' => $base_url);
-  app->routes->to('cors.headers' => 'Content-Type, Cache-Control');
+  app->routes->to({ 'cors.origin' => '*' });
+  app->routes->to({'cors.headers' => 'Content-Type, Cache-Control' });
 
   push @{app->static->paths},
     path( dist_dir('Language-Learner') )->child('spa'); 
 
   get '/' => sub { shift->reply->static('index.html') };
 
-  get '/words' => { 'cors.origin' => '*' } => sub ($c) {
+  get '/words' => sub ($c) {
     $c->render( json => [ keys %images ] );
   };
 
