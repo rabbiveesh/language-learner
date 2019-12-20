@@ -38,14 +38,13 @@ my $en = $fnames->map(sub { $_->[0] } );
 
 
 say 'spell checking';
-#TODO- replace with Text::Aspell
 use Language::Learner::SpellCheck;
 my $spell = Language::Learner::SpellCheck->new;
 $pt = $pt->map( sub { $spell->check($_) } );
 
 #TODO- no reason to rename the files, yet, b/c we may have multiple
 #suggestions
-say 'renaming files';
+#say 'renaming files';
 #$files->each( sub ($item, $index) {
 #  rename $item->to_string,
 #       $item->sibling("$pt->[$index - 1].mp3")->to_string

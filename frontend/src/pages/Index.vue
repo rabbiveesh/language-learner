@@ -1,5 +1,6 @@
 <template>
-  <q-page class="flex flex-center">
+  <q-page class="flex flex-center column">
+    <q-btn label="Reload" @click="getWords" />
     <div v-for="word in words" :key="word">
       {{ word }}
     </div>
@@ -14,11 +15,16 @@ export default {
       words: []
     }
   },
+  methods: {
+    getWords () {
+      this.$axios.get('http://localhost:9099/words')
+        .then((response) => {
+          this.words = response.data
+        })
+    }
+  },
   mounted () {
-    this.$axios.get('http://localhost:9099/words')
-      .then((response) => {
-        this.words = response.data
-      })
+    this.getWords()
   }
 }
 </script>

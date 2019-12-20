@@ -23,7 +23,7 @@ sub check ($self, @list) {
   for (@list) {
     my @words = split ' ', $_;
     for my $word (@words) {
-      $word = decode 'UTF-8', $word;
+      $word = $word;
       next if $spell->check($word);
       my @suggests = map { decode 'UTF-8', $_ } $spell->suggest($word);
       @suggests = grep { $word eq slugify $_ } @suggests;
