@@ -30,7 +30,7 @@ say 'splitting filenames';
 my $files = path->list->grep(qr/mp3$/);
 my $fnames = $files->map('basename', '.mp3')
    ->map(sub {
-     [map { trim $_ } split /-/, $_]
+     [map { trim decode 'UTF-8', $_ } split /-/, $_]
    });
 
 my $pt = $fnames->map(sub { $_->[1] } );
@@ -57,6 +57,7 @@ my @images_p;
 push @images_p, $pt_img->get_images(@$pt);
 push @images_p, $en_img->get_images(@$en);
 
+say 'getting images';
 my %images;
 Mojo::Promise->all(@images_p)
   ->then( sub { map { $_->[0] } @_ } )
