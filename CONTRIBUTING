@@ -1,0 +1,5 @@
+If you'd like to hack on this project, I would suggest setting the
+following git setting:
+  git config core.quotepath off
+
+b/c we deal with utf8 filenames here
