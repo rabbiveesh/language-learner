@@ -32,7 +32,7 @@ export default {
   },
   methods: {
     getWords () {
-      this.$axios.get('http://localhost:9099/words')
+      this.$axios.get('/words')
         .then((response) => {
           this.words = response.data
           this.tab = this.words[0]

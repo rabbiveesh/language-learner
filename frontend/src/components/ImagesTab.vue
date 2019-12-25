@@ -21,7 +21,7 @@ export default {
   },
   methods: {
     getImages () {
-      this.$axios.get(`http://localhost:9099/img/${this.word}`)
+      this.$axios.get(`/img/${this.word}`)
         .then(({ data }) => { this.images = data })
     },
     toggle (idx, v) {
@@ -30,7 +30,7 @@ export default {
       } else {
         this.selected = false
       }
-      this.$axios.post('http://localhost:9099/select/img',
+      this.$axios.post('/select/img',
         { selection: this.selected, word: this.word })
     }
   },

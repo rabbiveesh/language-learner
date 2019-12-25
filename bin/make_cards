@@ -3,7 +3,7 @@
 use utf8;
 use Language::Learner::Common;
 use Mojo::File qw/path/;
-use Mojo::Util qw/encode decode trim slugify/;
+use Mojo::Util qw/encode decode trim slugify getopt/;
 use Mojo::UserAgent;
 use Mojo::Promise;
 my $ua = Mojo::UserAgent->new->max_redirects(5);
@@ -17,6 +17,9 @@ use Language::Learner::GoogleImages;
 
 use Data::Printer;
 
+getopt
+  'd|dev' => \my $dev,
+;
 #check if cards have been made already
 #TODO- implement a flag to skip this check
 my $fname = 'cards.csv';
@@ -76,8 +79,7 @@ Mojo::Promise->all(@images_p)
   use File::ShareDir qw/dist_dir/;
   use Language::Learner::Common;
 
-  #my $base_url = "http://localhost:${\empty_port}";
-  my $base_url = "http://localhost:9099";
+  my $base_url = "http://localhost:${\($dev ? 9099 : empty_port)}";
 
   plugin 'SecureCORS';
   app->routes->to({ 'cors.origin' => '*' });
@@ -120,10 +122,7 @@ Mojo::Promise->all(@images_p)
 
 
   app->hook( before_server_start => sub ($server, @) {
-    $server->silent(1);
-    #TODO- reactivate this for non-dev mode
-    #      better yet, make a switch for dev mode
-    #system "firefox $base_url > /dev/null 2>&1 &";
+    system "firefox $base_url > /dev/null 2>&1 &" unless $dev;
   });
   app->start('daemon', '--listen', $base_url, qw/-m production/);
 }
