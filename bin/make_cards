@@ -94,9 +94,12 @@ Mojo::Promise->all(@images_p)
     $c->render( json => [ keys %images ] );
   };
 
-  get '/exit' => sub { 
-    Mojo::IOLoop->timer(.5, sub { Mojo::IOLoop->stop })
-  };
+  unless ($dev) {
+    app->routes->cors('/select/img');
+    post '/exit' => sub { 
+      Mojo::IOLoop->timer(.5, sub { Mojo::IOLoop->stop })
+    };
+  }
 
   get '/img/:word' => sub ($c) {
   #TODO- send along selections too
@@ -124,7 +127,7 @@ Mojo::Promise->all(@images_p)
   app->hook( before_server_start => sub ($server, @) {
     system "firefox $base_url > /dev/null 2>&1 &" unless $dev;
   });
-  app->start('daemon', '--listen', $base_url, qw/-m production/);
+  app->start('daemon', '--listen', $base_url, ( $dev || qw/-m production/ ) );
 }
 
 

@@ -42,7 +42,9 @@ export default {
   mounted () {
     this.getWords()
     window.addEventListener('unload',
-      () => navigator.sendBeacon('/exit')
+      () => {
+        navigator.sendBeacon(`${this.$baseURL}/exit`)
+      }
     )
   }
 }
