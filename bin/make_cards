@@ -58,7 +58,7 @@ push @images_p, $pt_img->get_images(@$pt);
 push @images_p, $en_img->get_images(@$en);
 
 say 'getting images';
-my %images;
+my (%images, %selected);
 Mojo::Promise->all(@images_p)
   ->then( sub { map { $_->[0] } @_ } )
   ->then(sub ($pt_r, $en_r) {
@@ -97,16 +97,37 @@ Mojo::Promise->all(@images_p)
   };
 
   get '/img/:word' => sub ($c) {
+  #TODO- send along selections too
     $c->render( json => $images{$c->stash('word')} );
+  };
+
+  app->routes->cors('/select/img');
+  post '/select/img' => sub ($c) {
+    my $args = $c->req->json;
+    unless ($args->{word} && exists $args->{selection}) {
+      $c->code(400);
+      return $c->render(text => 'missing necessary params')
+    }
+    my $s = $args->{selection};
+    $selected{$args->{word}}{selection} = $s;
+    if ($s) {
+      $c->render(text => "Selected $s");
+    } else {
+      $c->render(text => "Removed selection");
+    }
+    app->log->warn(np %selected);
   };
 
 
   app->hook( before_server_start => sub ($server, @) {
     $server->silent(1);
-    system "firefox $base_url > /dev/null 2>&1 &";
+    #TODO- reactivate this for non-dev mode
+    #      better yet, make a switch for dev mode
+    #system "firefox $base_url > /dev/null 2>&1 &";
   });
   app->start('daemon', '--listen', $base_url, qw/-m production/);
 }
+
 
 die;
 say 'generating basic cards';

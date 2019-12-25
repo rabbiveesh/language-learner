@@ -1,23 +1,37 @@
 <template>
   <div>
-    <img class="col" v-for="img in images" :key="img.src"
-      :src="img.src" />
+    <selectable-img v-for="(img, idx) in images" :key="idx"
+      :src="img.src" :selected="selected === idx"
+      @selected="v => toggle(idx,v)" />
   </div>
 </template>
 
 <script>
+import SelectableImg from './SelectableImg.vue'
+
 export default {
   name: 'ImagesTab',
+  components: { SelectableImg },
   props: [ 'word' ],
   data () {
     return {
-      images: []
+      images: [],
+      selected: false
     }
   },
   methods: {
     getImages () {
       this.$axios.get(`http://localhost:9099/img/${this.word}`)
         .then(({ data }) => { this.images = data })
+    },
+    toggle (idx, v) {
+      if (v) {
+        this.selected = idx
+      } else {
+        this.selected = false
+      }
+      this.$axios.post('http://localhost:9099/select/img',
+        { selection: this.selected, word: this.word })
     }
   },
   mounted () {

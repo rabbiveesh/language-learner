@@ -41,6 +41,9 @@ export default {
   },
   mounted () {
     this.getWords()
+    window.addEventListener('unload',
+      () => navigator.sendBeacon('/exit')
+    )
   }
 }
 </script>
