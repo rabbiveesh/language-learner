@@ -95,15 +95,17 @@ Mojo::Promise->all(@images_p)
   };
 
   unless ($dev) {
-    app->routes->cors('/select/img');
     post '/exit' => sub { 
       Mojo::IOLoop->timer(.5, sub { Mojo::IOLoop->stop })
     };
   }
 
   get '/img/:word' => sub ($c) {
-  #TODO- send along selections too
     $c->render( json => $images{$c->stash('word')} );
+  };
+
+  get '/selection/:word' => sub ($c) {
+    $c->render( json => $selected{$c->stash('word')} )
   };
 
   app->routes->cors('/select/img');
@@ -114,7 +116,7 @@ Mojo::Promise->all(@images_p)
       return $c->render(text => 'missing necessary params')
     }
     my $s = $args->{selection};
-    $selected{$args->{word}}{selection} = $s;
+    $selected{$args->{word}} = $s;
     if ($s) {
       $c->render(text => "Selected $s");
     } else {

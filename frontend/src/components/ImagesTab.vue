@@ -22,7 +22,14 @@ export default {
   methods: {
     getImages () {
       this.$axios.get(`/img/${this.word}`)
-        .then(({ data }) => { this.images = data })
+        .then(({ data }) => {
+          this.images = data
+        })
+      this.$axios.get(`/selection/${this.word}`)
+        .then(({ data }) => {
+          console.log(data)
+          this.selected = data
+        })
     },
     toggle (idx, v) {
       if (v) {
