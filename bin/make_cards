@@ -23,11 +23,10 @@ getopt
 #check if cards have been made already
 #TODO- implement a flag to skip this check
 my $fname = 'cards.csv';
-die 'file already exists' if path($fname)->stat;
+unless ($dev) {
+  die 'file already exists' if path($fname)->stat;
+}
 
-my @rows;
-
-my %words;
 
 say 'splitting filenames';
 my $files = path->list->grep(qr/mp3$/);
@@ -45,14 +44,7 @@ use Language::Learner::SpellCheck;
 my $spell = Language::Learner::SpellCheck->new;
 $pt = $pt->map( sub { $spell->check($_) } );
 
-#TODO- no reason to rename the files, yet, b/c we may have multiple
-#suggestions
-#say 'renaming files';
-#$files->each( sub ($item, $index) {
-#  rename $item->to_string,
-#       $item->sibling("$pt->[$index - 1].mp3")->to_string
-#});
-
+say 'getting images';
 my $en_img = Language::Learner::GoogleImages->new(language => 'en');
 my $pt_img = Language::Learner::GoogleImages->new(language => 'pt-BR');
 
@@ -60,7 +52,6 @@ my @images_p;
 push @images_p, $pt_img->get_images(@$pt);
 push @images_p, $en_img->get_images(@$en);
 
-say 'getting images';
 my (%images, %selected);
 Mojo::Promise->all(@images_p)
   ->then( sub { map { $_->[0] } @_ } )
@@ -70,6 +61,9 @@ Mojo::Promise->all(@images_p)
       } $pt_r->@*, $en_r->@*;
   })
 ->wait;
+
+#TODO- we wanna get some basic information from wiktionary at this
+#point, like a list of ipa basics and such
 
 {
   use Mojolicious::Lite;
@@ -100,6 +94,8 @@ Mojo::Promise->all(@images_p)
     };
   }
 
+  #TODO- implement retrieval of more images
+  #      that means adding a page attribute for the images scraper
   get '/img/:word' => sub ($c) {
     $c->render( json => $images{$c->stash('word')} );
   };
@@ -122,7 +118,6 @@ Mojo::Promise->all(@images_p)
     } else {
       $c->render(text => "Removed selection");
     }
-    app->log->warn(np %selected);
   };
 
 
@@ -133,24 +128,40 @@ Mojo::Promise->all(@images_p)
 }
 
 
-die;
+#TODO- take the user's selection, and pwn its z0rz!
+# we need to copy it to the anki media directory and crud
+my %file_hash = pairwise { ( $a => $b ) } @$pt, @$files;
+
+say 'downloading images';
+my @image_promises;
+for my $word (keys %images) {
+  my $src = $images{$word}[$selected{$word}]{src};
+  push @image_promises, $ua->get_p($src)
+    ->then( sub ($tx) {
+      my $res = $tx->res;
+      my $type = $res->headers->content_type;
+      $type =~ s+image/++;
+      my $target = encode 'utf-8', "$word.$type";
+      $res->save_to($target)
+    });
+  #TODO- content negotiation to do correct extension
+}
+
+Mojo::Promise->all(@image_promises)->wait;
+
 say 'generating basic cards';
-path->list->grep(qr/mp3$/)
-    ->map(qw/basename .mp3/)
-    ->map( sub {
-        @words{split / /, $_} = 1;
-        return $_
-      })
-    ->map( sub {
+my @rows;
+$pt->map( sub {
       my $word = $_;
-      $_ = decode 'UTF-8', $_;
       push @rows, { 
         Spelling => $_, 
-        Image => qq(<img src="$images{$word}[0]">),
-        Audio => "[sound:$_.mp3]",
+        Image => qq(<img src="$images{$word}[0]{src}">),
+        Audio => "[sound:ll-${\($file_hash{$_}->basename)}]",
       };
       return $word
     });
+p @rows;
+die;
 
 #TODO- make this configurable on install
 my $collection = path(
@@ -158,8 +169,8 @@ my $collection = path(
 );
 
 say 'copying the media';
-path->list->map( sub { 
-  $_->copy_to( $collection->child($_->basename)->to_string )
+$files->map( sub { 
+  $_->copy_to( $collection->child('ll-' . $_->basename)->to_string )
 });
 
 say 'writing the file';
