@@ -19,3 +19,8 @@ nytprof.out
 /Language-Learner-*
 
 .*.sw?
+
+*.jpg
+*.jpeg
+*.png
+cards.csv

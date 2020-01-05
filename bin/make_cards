@@ -141,11 +141,11 @@ for my $word (keys %images) {
       my $res = $tx->res;
       my $type = $res->headers->content_type;
       $type =~ s+image/++;
-      $selected{$word}{file} = "ll-$word.$type";
-      my $target = encode 'utf-8', $selected{$word}{file};
+      $selected{$word} = "ll-$word.$type";
+      my $target = encode 'utf-8', $selected{$word};
       $res->save_to($target);
       return $target;
-    });
+    })->catch(sub { die @_ } );
 }
 
 Mojo::Promise->all(@image_promises)->wait;
@@ -155,7 +155,7 @@ my @rows;
 $pt->map( sub {
       push @rows, { 
         Spelling => $_, 
-        Image => qq(<img src="$selected{$_}{file}">),
+        Image => qq(<img src="$selected{$_}">),
         Audio => "[sound:ll-${\($file_hash{$_}->basename)}]",
       };
       return $_
@@ -178,7 +178,7 @@ $files->map( sub {
 });
 
 $pt->map( sub {
-  my $name = encode 'utf-8', $selected{$_}{file};
+  my $name = encode 'utf-8', $selected{$_};
   path($name)->copy_to( $collection->child($name)->to_string );
 });
 
