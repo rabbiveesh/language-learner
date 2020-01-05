@@ -141,10 +141,11 @@ for my $word (keys %images) {
       my $res = $tx->res;
       my $type = $res->headers->content_type;
       $type =~ s+image/++;
-      my $target = encode 'utf-8', "$word.$type";
-      $res->save_to($target)
+      $selected{$word}{file} = "ll-$word.$type";
+      my $target = encode 'utf-8', $selected{$word}{file};
+      $res->save_to($target);
+      return $target;
     });
-  #TODO- content negotiation to do correct extension
 }
 
 Mojo::Promise->all(@image_promises)->wait;
@@ -152,16 +153,19 @@ Mojo::Promise->all(@image_promises)->wait;
 say 'generating basic cards';
 my @rows;
 $pt->map( sub {
-      my $word = $_;
       push @rows, { 
         Spelling => $_, 
-        Image => qq(<img src="$images{$word}[0]{src}">),
+        Image => qq(<img src="$selected{$_}{file}">),
         Audio => "[sound:ll-${\($file_hash{$_}->basename)}]",
       };
-      return $word
+      return $_
     });
-p @rows;
-die;
+
+say 'writing the file';
+my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
+my @fields = (qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
+$sheet->addrow($_->@{@fields}) for @rows;
+$sheet->close;
 
 #TODO- make this configurable on install
 my $collection = path(
@@ -173,8 +177,9 @@ $files->map( sub {
   $_->copy_to( $collection->child('ll-' . $_->basename)->to_string )
 });
 
-say 'writing the file';
-my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
-my @fields = (qw/ Spelling Image Audio Extra/, 'Part of Speech', 'IPA');
-$sheet->addrow($_->@{@fields}) for @rows;
-$sheet->close;
+$pt->map( sub {
+  my $name = encode 'utf-8', $selected{$_}{file};
+  path($name)->copy_to( $collection->child($name)->to_string );
+});
+
+

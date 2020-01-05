@@ -6,6 +6,8 @@
     </q-tabs>
 
     <q-tab-panels v-model="tab" animated >
+      <!-- I think it should be fit, but fill seems to work for
+      some reason -->
       <q-tab-panel class="fill" :name="word" v-for="word in words"
         :key="word" >
         <images-tab :word="word"/>
