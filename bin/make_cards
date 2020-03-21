@@ -62,6 +62,7 @@ Mojo::Promise->all(@images_p)
   })
 ->wait;
 
+
 #TODO- we wanna get some basic information from wiktionary at this
 #point, like a list of ipa basics and such
 
@@ -132,9 +133,13 @@ Mojo::Promise->all(@images_p)
 # we need to copy it to the anki media directory and crud
 my %file_hash = pairwise { ( $a => $b ) } @$pt, @$files;
 
+die 'nothing selected' unless grep keys %selected;
+
 say 'downloading images';
 my @image_promises;
 for my $word (keys %images) {
+  #TODO- implement skipping non-selected words
+  #     also allow for deletion of tabs in frontend
   my $src = $images{$word}[$selected{$word}]{src};
   push @image_promises, $ua->get_p($src)
     ->then( sub ($tx) {

@@ -34,7 +34,8 @@ sub get_images ($self, $options, @words) {
         my $res = $tx->res;
         die join ' - ', $res->error->@{qw/code message/} if $res->error;
 
-        my $results = $res->dom->find("img[alt*=$word]")
+        use Data::Printer;
+        my $results = $res->dom->find('img[src*="gstatic"]')
           ->map(sub { $_->parent->parent  }) #get the td
           ->map( sub { $_->at('a')->replace( $_->at('img') ) } ) 
           ->map( sub { 
