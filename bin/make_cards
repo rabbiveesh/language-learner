@@ -19,6 +19,7 @@ use Data::Printer;
 
 getopt
   'd|dev' => \my $dev,
+  'l|logs' => \my $debug
 ;
 #check if cards have been made already
 #TODO- implement a flag to skip this check
@@ -80,6 +81,7 @@ Mojo::Promise->all(@images_p)
   app->routes->to({ 'cors.origin' => '*' });
   app->routes->to({'cors.headers' => 'Content-Type, Cache-Control' });
 
+
   push @{app->static->paths},
     path( dist_dir('Language-Learner') )->child('spa'); 
 
@@ -125,7 +127,7 @@ Mojo::Promise->all(@images_p)
   app->hook( before_server_start => sub ($server, @) {
     system "firefox $base_url > /dev/null 2>&1 &" unless $dev;
   });
-  app->start('daemon', '--listen', $base_url, ( $dev || qw/-m production/ ) );
+  app->start('daemon', '--listen', $base_url, ( $dev || $debug || qw/-m production/ ) );
 }
 
 
@@ -133,7 +135,7 @@ Mojo::Promise->all(@images_p)
 # we need to copy it to the anki media directory and crud
 my %file_hash = pairwise { ( $a => $b ) } @$pt, @$files;
 
-die 'nothing selected' unless grep keys %selected;
+die 'nothing selected' unless grep $_, keys %selected;
 
 say 'downloading images';
 my @image_promises;
