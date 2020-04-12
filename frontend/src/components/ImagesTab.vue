@@ -1,7 +1,7 @@
 <template>
   <div>
     <selectable-img v-for="(img, idx) in images" :key="idx"
-      :src="img.src" :selected="selected === idx"
+      :src="img.src" :text="img.text" :selected="selected === idx"
       @selected="v => toggle(idx,v)" />
   </div>
 </template>

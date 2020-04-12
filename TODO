@@ -1,3 +1,15 @@
+We have to make provisions in the frontend for when the word list
+is too long.
+
+We also have to add the ability to remove a word from our list.
+
+We also want to have a frontend tool for inputting the words that
+you want, and then you can also specify any additional search to
+go along with that word (should help for sentences).
+
+We also want to be able to remove certain images (probz more
+important for if we put this up on the interwebz).
+
 add in our reverso scraper as a tool
 
 also make a Tool namespace.

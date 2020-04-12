@@ -4,6 +4,7 @@ use utf8;
 use Language::Learner::Common;
 use Mojo::File qw/path/;
 use Mojo::Util qw/encode decode trim slugify getopt/;
+use Mojo::Collection qw/c/;
 use Mojo::UserAgent;
 use Mojo::Promise;
 my $ua = Mojo::UserAgent->new->max_redirects(5);
@@ -19,7 +20,10 @@ use Data::Printer;
 
 getopt
   'd|dev' => \my $dev,
-  'l|logs' => \my $debug
+  'l|logs' => \my $debug,
+  's|spell' => \my $spellcheck,
+  'w|wordlist=s' => \my $wordlist,
+  't|target=s' => \my $target_lang,
 ;
 #check if cards have been made already
 #TODO- implement a flag to skip this check
@@ -29,25 +33,34 @@ unless ($dev) {
 }
 
 
+my ($files, $splitwords);
 say 'splitting filenames';
-my $files = path->list->grep(qr/mp3$/);
-my $fnames = $files->map('basename', '.mp3')
-   ->map(sub {
-     [map { trim decode 'UTF-8', $_ } split /-/, $_]
-   });
+# NOTE- it's english first, then target language
+if ($wordlist) {
+  my @list = split /\n/, path($wordlist)->slurp;
+  $splitwords = c( map { [ map { trim decode 'UTF-8', $_ } split /-/, $_ ] } @list );
+} else {
+  $files = path->list->grep(qr/mp3$/);
+  $splitwords = $files->map('basename', '.mp3')
+     ->map(sub {
+       [map { trim decode 'UTF-8', $_ } split /-/, $_]
+     });
 
-my $pt = $fnames->map(sub { $_->[1] } );
-my $en = $fnames->map(sub { $_->[0] } );
+}
+my $pt = $splitwords->map(sub { $_->[1] || $_->[0] } );
+my $en = $splitwords->map(sub { $_->[0] } );
 
 
-say 'spell checking';
-use Language::Learner::SpellCheck;
-my $spell = Language::Learner::SpellCheck->new;
-$pt = $pt->map( sub { $spell->check($_) } );
+if ($spellcheck) {
+  say 'spell checking';
+  require Language::Learner::SpellCheck;
+  my $spell = Language::Learner::SpellCheck->new;
+  $pt = $pt->map( sub { $spell->check($_) } );
+}
 
 say 'getting images';
 my $en_img = Language::Learner::GoogleImages->new(language => 'en');
-my $pt_img = Language::Learner::GoogleImages->new(language => 'pt-BR');
+my $pt_img = Language::Learner::GoogleImages->new(language => $target_lang || 'pt-BR');
 
 my @images_p;
 push @images_p, $pt_img->get_images(@$pt);
@@ -107,6 +120,13 @@ Mojo::Promise->all(@images_p)
     $c->render( json => $selected{$c->stash('word')} )
   };
 
+  del '/img/:word' => sub ($c) {
+    my $word = $c->stash('word');
+    delete $images{$word};
+    delete $selected{$word};
+    $c->render( json => [] );
+  };
+
   app->routes->cors('/select/img');
   post '/select/img' => sub ($c) {
     my $args = $c->req->json;
@@ -133,16 +153,18 @@ Mojo::Promise->all(@images_p)
 
 #TODO- take the user's selection, and pwn its z0rz!
 # we need to copy it to the anki media directory and crud
-my %file_hash = pairwise { ( $a => $b ) } @$pt, @$files;
+my %file_hash;
+%file_hash = pairwise { ( $a => $b ) } @$pt, @$files
+ #unless of course, we weren't given any audio files
+ unless $wordlist;
 
 die 'nothing selected' unless grep $_, keys %selected;
 
 say 'downloading images';
 my @image_promises;
 for my $word (keys %images) {
-  #TODO- implement skipping non-selected words
-  #     also allow for deletion of tabs in frontend
-  my $src = $images{$word}[$selected{$word}]{src};
+  next unless my $index = $selected{$word};
+  my $src = $images{$word}[$index]{src};
   push @image_promises, $ua->get_p($src)
     ->then( sub ($tx) {
       my $res = $tx->res;
@@ -160,13 +182,16 @@ Mojo::Promise->all(@image_promises)->wait;
 say 'generating basic cards';
 my @rows;
 $pt->map( sub {
-      push @rows, { 
-        Spelling => $_, 
-        Image => qq(<img src="$selected{$_}">),
-        Audio => "[sound:ll-${\($file_hash{$_}->basename)}]",
-      };
-      return $_
-    });
+  return unless my $src = $selected{$_};
+  my $row = { 
+    Spelling => $_, 
+    Image => qq(<img src="$selected{$_}">),
+  };
+  if (my $audio = $file_hash{$_}) {
+    $row->{Audio} = "[sound:ll-${\($audio->basename)}]";
+  }
+  push @rows, $row;
+});
 
 say 'writing the file';
 my $sheet = Spreadsheet::Write->new(file => $fname, csv_options => { binary => 1 });
@@ -182,10 +207,11 @@ my $collection = path(
 say 'copying the media';
 $files->map( sub { 
   $_->copy_to( $collection->child('ll-' . $_->basename)->to_string )
-});
+}) unless $wordlist;
 
 $pt->map( sub {
-  my $name = encode 'utf-8', $selected{$_};
+  return unless my $src = $selected{$_};
+  my $name = encode 'utf-8', $src;
   path($name)->copy_to( $collection->child($name)->to_string );
 });
 
