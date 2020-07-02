@@ -1,0 +1,42 @@
+#! /usr/bin/env perl
+#
+use Language::Learner::Common;
+use Mojo::File qw/path/;
+use Mojo::Util qw/encode decode trim/;
+
+my $files = path->list;
+
+my $words = $files
+  ->map('basename')
+  ->map(sub { trim decode 'UTF-8', $_ } )
+  ->map(sub { s/[.].+$//r })
+  ->uniq;
+
+my $audios = $files->grep(sub { $_->basename =~ /[.]mp3/ } );
+my $images = $files->grep(sub { $_->basename !~ /[.]mp3/ } );
+
+my $collection = path(
+  '/home/veesh/.local/share/Anki2/Veesh/collection.media/'
+);
+
+say 'generating basic cards';
+my @rows;
+$words->map( sub {
+  my $row = { 
+    Spelling => $_, 
+    Image => qq(<img src="$selected{$_}">),
+  };
+  if (my $audio = $file_hash{$_}) {
+    $row->{Audio} = "[sound:ll-${\($audio->basename)}]";
+  }
+  push @rows, $row;
+});
+use Data::Printer;
+p @rows;
+
+die;
+
+say 'copying the media';
+$files->map(sub { 
+  $_->copy_to( $collection->child('ll-' . $_->basename)->to_string )
+});

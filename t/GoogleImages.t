@@ -2,13 +2,14 @@ use Language::Learner::Test;
 use Language::Learner::GoogleImages;
 use Future::AsyncAwait;
 
-my $g_images_pt = Language::Learner::GoogleImages->new;
+ok my $g_images_pt = Language::Learner::GoogleImages->new, 
+  'can instantiate';
 
 my $images;
-
 async sub get_them {
   $images = await $g_images_pt->get_images(@_)
 }
+
 
 get_them('bolacha')->wait;
 
