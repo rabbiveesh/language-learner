@@ -1,43 +1,35 @@
-#Language::Learner
+# Language Learner
 
-This project is an attempt to automate my language learning
-habits. I'm a huge fan of Fluent Forever, and I enjoy self
-learning.
+A personal app for learning languages the Fluent Forever way: pictures instead of translations,
+native-speaker audio, and spaced repetition built in. Brazilian Portuguese first, Japanese next.
 
-Currently, I'm learning Portuguese. Therefore, the tools are by
-default looking for things in Portuguese. In the future, this will
-be customizable with a config file.
+- Plan and decisions: [Language learner rewrite](https://claude.ai/artifact/JJQAhU3bnLwbUnKX4UyDeU)
+- How to work on it: [CLAUDE.md](CLAUDE.md)
 
+## Layout
 
+| Path | What |
+| --- | --- |
+| `crates/domain` | Notes, cards, review log, typed-answer grading, FSRS scheduling |
+| `crates/adapt` | Adaptive difficulty engine (generic, from the games) |
+| `crates/media` | Picture / audio / dictionary sources and the modesty filter |
+| `crates/server` | axum + SQLite API, serves the built web app |
+| `web/` | Vue 3 + Nuxt UI front end |
+| `config/` | Plain-text configuration (the picture standard) |
 
+## Running it
 
-#Layout
+```sh
+cargo test                      # all Rust tests; also regenerates web/src/generated
+cargo run -p server             # API on :8080, database in data/
 
-This package is arranged as follows. The main module is
-Language::Learner. It is a frontend which ties together
-individual tools, like Language::Learner::Wiktionary.
-(The fact that I haven't done that yet is not indicative that this
-isn't the plan, lol).
+cd web
+npm ci
+npm run dev                     # Vite on :5173, proxies /api to :8080
+npm run test:unit -- --run
+```
 
-In addition to the tools, there are a bunch of Style Kits. This is
-to keep the coding style and feature set the same across the whole
-project. The main style is in Language::Learner::Common, which all
-files should `use`. Then, there one for Tests, and one for
-Classes.
+Use npm 11 or later (Node 24); npm 10 trips over a peer dependency in jsdom.
 
-I personally like using Types and Type Coercions, so those are
-stored in Language::Learner::Types. All coercions and logic about
-that should go there.
-
-#Roadmap
-
-I plan on adding the following tools:
-
--  google image search
--  google translate search
--  a spell checking search (to add/correct accents, maybe using
-   google translate)
--  forvo.com search, to find audio
-
-In addition, I plan on developing a frontend application for this,
-so you can access all the tools from one screen.
+Settings come from the environment: `DATABASE_URL` (default `sqlite://data/language-learner.db`),
+`PORT` (default 8080) and `WEB_DIST` (default `web/dist`).
