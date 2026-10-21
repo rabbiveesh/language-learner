@@ -1,0 +1,17 @@
+[package]
+name = "adapt"
+version = "0.1.0"
+description = "The adaptive difficulty engine: bands, an assist dial, calibration and frustration handling, generic over the caller's skills."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rand.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
