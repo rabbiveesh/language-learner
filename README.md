@@ -13,6 +13,7 @@ native-speaker audio, and spaced repetition built in. Brazilian Portuguese first
 | `crates/domain` | Notes, cards, review log, typed-answer grading, FSRS scheduling |
 | `crates/adapt` | Adaptive difficulty engine (generic, from the games) |
 | `crates/media` | Picture / audio / dictionary sources and the modesty filter |
+| `crates/eval` | Scores scheduler variants on a real review history (an Anki export) |
 | `crates/server` | axum + SQLite API, serves the built web app |
 | `web/` | Vue 3 + Nuxt UI front end |
 | `config/` | Plain-text configuration (the picture standard) |
@@ -27,6 +28,12 @@ cd web
 npm ci
 npm run dev                     # Vite on :5173, proxies /api to :8080
 npm run test:unit -- --run
+```
+
+To score scheduling ideas on your own history:
+
+```sh
+cargo run --release -p eval -- collection.colpkg --deck portuguese
 ```
 
 Use npm 11 or later (Node 24); npm 10 trips over a peer dependency in jsdom.
