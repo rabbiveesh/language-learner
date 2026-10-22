@@ -1,6 +1,6 @@
-# Language Learner
+# Fala
 
-A personal app for learning languages the Fluent Forever way: pictures instead of translations,
+Fala ("speak" in Portuguese) is a personal app for learning languages the Fluent Forever way: pictures instead of translations,
 native-speaker audio, and spaced repetition built in. Brazilian Portuguese first, Japanese next.
 
 - Plan and decisions: [Language learner rewrite](https://claude.ai/artifact/JJQAhU3bnLwbUnKX4UyDeU)
@@ -38,5 +38,18 @@ cargo run --release -p eval -- collection.colpkg --deck portuguese
 
 Use npm 11 or later (Node 24); npm 10 trips over a peer dependency in jsdom.
 
-Settings come from the environment: `DATABASE_URL` (default `sqlite://data/language-learner.db`),
-`PORT` (default 8080) and `WEB_DIST` (default `web/dist`).
+Settings come from the environment:
+
+| Variable | Default | What |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite://data/fala.db` | The SQLite database |
+| `PORT` | `8080` | Where the server listens |
+| `WEB_DIST` | `web/dist` | The built web app |
+| `PUBLIC_ORIGIN` | `http://localhost:8080` | Where the app is served; passkeys are tied to its host. Any localhost port works in dev |
+| `SESSION_KEY` | random on localhost | Encrypts the sign-in cookie; at least 64 bytes (`openssl rand -hex 64`). Required outside localhost |
+| `SETUP_TOKEN` | none | Lets the first passkey be created, at `/setup?token=…` |
+
+Run locally with `SETUP_TOKEN=anything cargo run -p server`, then open
+`http://localhost:8080/setup?token=anything` (or the Vite port) to create a passkey.
+
+Deploying to Fly (fala.veesh.me): [docs/deploy.md](docs/deploy.md).

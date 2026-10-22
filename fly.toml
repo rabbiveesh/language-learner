@@ -1,0 +1,31 @@
+# Fala on Fly: one small machine, SQLite on a volume, backed up by Litestream.
+# First-time setup is in docs/deploy.md.
+
+app = "fala-veesh"
+primary_region = "fra"
+
+[env]
+  PUBLIC_ORIGIN = "https://fala.veesh.me"
+  RUST_LOG = "info"
+
+[[mounts]]
+  source = "fala_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
