@@ -71,6 +71,10 @@ pub struct Sample {
     pub item: FSRSItem,
     /// Cards introduced on the day this card was introduced, itself included.
     pub new_that_day: u32,
+    /// Reviews answered on the day of this review, across all cards: that day's workload.
+    pub reviews_that_day: u32,
+    /// Where this review fell in that day's reviews, from 1.
+    pub nth_that_day: u32,
 }
 
 impl Sample {
@@ -87,10 +91,24 @@ impl Sample {
 /// are history but never targets.
 pub fn samples(reviews: &[LoggedReview]) -> Vec<Sample> {
     // Each review keeps its place in the log, so targets come out in the order they happened.
+    let answered: Vec<(usize, &LoggedReview)> = reviews
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| {
+            r.kind != ReviewKind::Manual && r.kind != ReviewKind::Filtered && r.rating > 0
+        })
+        .collect();
+
+    let mut load: HashMap<LearningDay, u32> = HashMap::new();
+    let mut nth: HashMap<usize, u32> = HashMap::with_capacity(answered.len());
+    for (i, r) in &answered {
+        let count = load.entry(r.day).or_default();
+        *count += 1;
+        nth.insert(*i, *count);
+    }
+
     let mut by_card: BTreeMap<i64, Vec<(usize, &LoggedReview)>> = BTreeMap::new();
-    for (i, r) in reviews.iter().enumerate().filter(|(_, r)| {
-        r.kind != ReviewKind::Manual && r.kind != ReviewKind::Filtered && r.rating > 0
-    }) {
+    for (i, r) in answered {
         by_card.entry(r.card_id).or_default().push((i, r));
     }
     let histories: Vec<(i64, Vec<(usize, &LoggedReview)>)> = by_card
@@ -130,6 +148,8 @@ pub fn samples(reviews: &[LoggedReview]) -> Vec<Sample> {
                             reviews: reviews.clone(),
                         },
                         new_that_day,
+                        reviews_that_day: load[&this.day],
+                        nth_that_day: nth[&i],
                     },
                 ));
             }
@@ -243,6 +263,28 @@ mod tests {
         ];
         let cards: Vec<i64> = samples(&log).iter().map(|s| s.card_id).collect();
         assert_eq!(cards, [2, 1]);
+    }
+
+    #[test]
+    fn each_target_knows_the_days_workload_and_its_place_in_it() {
+        let log = [
+            review(1, at(0, 10), 3, ReviewKind::Learning),
+            review(2, at(0, 10), 3, ReviewKind::Learning),
+            review(3, at(1, 10), 3, ReviewKind::Learning),
+            review(2, at(1, 11), 3, ReviewKind::Review),
+            review(1, at(1, 12), 1, ReviewKind::Review),
+            review(4, at(1, 13), 0, ReviewKind::Manual),
+        ];
+        let s = samples(&log);
+        let load: Vec<(i64, u32, u32)> = s
+            .iter()
+            .map(|s| (s.card_id, s.reviews_that_day, s.nth_that_day))
+            .collect();
+        assert_eq!(
+            load,
+            [(2, 3, 2), (1, 3, 3)],
+            "the manual reschedule isn't work"
+        );
     }
 
     #[test]

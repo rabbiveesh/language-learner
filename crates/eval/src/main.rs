@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use eval::{DayClock, by_intake, fit, samples, score, split_by_time};
+use eval::{Bucket, DayClock, fit, recall_by, samples, score, split_by_time};
 use jiff::tz::TimeZone;
 
 #[derive(Parser)]
@@ -36,6 +36,8 @@ struct Args {
 
 /// Lower bounds of the intake slices: cards introduced that day.
 const INTAKE_EDGES: [u32; 5] = [1, 6, 11, 21, 41];
+/// Lower bounds of the load slices: reviews answered that day, or a review's place among them.
+const LOAD_EDGES: [u32; 6] = [1, 51, 101, 201, 401, 801];
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -109,27 +111,41 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let (name, params) = variants.last().expect("defaults are always there");
-    println!("\nrecall by cards introduced that day ({name}, test set)");
-    println!(
-        "{:<8} {:>6} {:>10} {:>8} {:>7}",
-        "new/day", "n", "predicted", "actual", "gap"
+    println!("\nrecall by slice ({name}, test set); a gap is actual minus predicted");
+    print_slices(
+        "new/day",
+        &recall_by(params, &split.test, &INTAKE_EDGES, |s| s.new_that_day)?,
     );
-    for b in by_intake(params, &split.test, &INTAKE_EDGES)? {
-        if b.n == 0 {
-            continue;
-        }
-        let gap = (b.actual - b.predicted) * 100.0;
+    println!(
+        "if the gap drops as new/day grows, big intake days fade faster than the model expects"
+    );
+    print_slices(
+        "reviews/day",
+        &recall_by(params, &split.test, &LOAD_EDGES, |s| s.reviews_that_day)?,
+    );
+    print_slices(
+        "nth today",
+        &recall_by(params, &split.test, &LOAD_EDGES, |s| s.nth_that_day)?,
+    );
+    println!(
+        "if the gap drops as reviews/day or nth today grows, heavy days or long sessions cost recall"
+    );
+    Ok(())
+}
+
+fn print_slices(heading: &str, buckets: &[Bucket]) {
+    println!(
+        "\n{:<12} {:>6} {:>10} {:>8} {:>7}",
+        heading, "n", "predicted", "actual", "gap"
+    );
+    for b in buckets.iter().filter(|b| b.n > 0) {
         println!(
-            "{:<8} {:>6} {:>9.1}% {:>7.1}% {:>+6.1}pp",
+            "{:<12} {:>6} {:>9.1}% {:>7.1}% {:>+6.1}pp",
             b.label,
             b.n,
             b.predicted * 100.0,
             b.actual * 100.0,
-            gap
+            (b.actual - b.predicted) * 100.0
         );
     }
-    println!(
-        "\ncompare the gaps between rows: if they drop as new/day grows, big intake days fade faster than the model expects"
-    );
-    Ok(())
 }

@@ -11,6 +11,10 @@ pub struct Learner {
     pub binge_at: u32,
     /// ...really have this share of the stability the model thinks they have.
     pub binge_stability: f32,
+    /// Reviews after this many in one day...
+    pub tired_after: u32,
+    /// ...are recalled with this share of the chance the model gives them.
+    pub tired_recall: f32,
 }
 
 impl Learner {
@@ -18,6 +22,8 @@ impl Learner {
         Learner {
             binge_at: u32::MAX,
             binge_stability: 1.0,
+            tired_after: u32::MAX,
+            tired_recall: 1.0,
         }
     }
 }
@@ -44,14 +50,21 @@ pub fn simulate(
     let mut log = Vec::new();
     for day in 0..days {
         let today = LearningDay(day as i32);
+        let mut done_today = 0;
         for c in cards.iter_mut().filter(|c| c.due_day <= day) {
+            done_today += 1;
+            let tired = if done_today > learner.tired_after {
+                learner.tired_recall
+            } else {
+                1.0
+            };
             let elapsed = (day - c.last_day) as u32;
             let truth = MemoryState {
                 stability: c.memory.stability * c.true_share,
                 ..c.memory
             };
             let recalled =
-                rng.random::<f32>() < current_retrievability(truth, elapsed as f32, decay);
+                rng.random::<f32>() < tired * current_retrievability(truth, elapsed as f32, decay);
             let next = fsrs.next_states(Some(c.memory), 0.9, elapsed).unwrap();
             let (state, rating) = if recalled {
                 (next.good, 3)

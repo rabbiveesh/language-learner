@@ -13,4 +13,4 @@ pub mod revlogs_10k;
 pub mod score;
 
 pub use history::{DayClock, LearningDay, LoggedReview, ReviewKind, Sample, samples};
-pub use score::{Bucket, Split, by_intake, fit, predict, score, split_by_time};
+pub use score::{Bucket, Split, fit, predict, recall_by, score, split_by_time};

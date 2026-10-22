@@ -3,16 +3,17 @@
 //! `revlogs/user_id=N/data.parquet`.
 //!
 //! The dataset has no timestamps. Each row has the learning day it fell on (`day_offset`, days
-//! since the collection started, already shifted by the user's time zone and rollover hour), and
-//! the rows are in the order the reviews happened (the FSRS benchmark relies on both). That is
-//! exactly a review log on learning days.
+//! since the user's first review), and the rows are "pre-sorted in chronological order" (the
+//! dataset card). That is exactly a review log on learning days.
 //!
-//! The `state` column isn't read: its encoding is documented only on the gated dataset card, and
-//! [`crate::samples`] needs no more than where each card's history starts. So a card's first row
-//! is its [`ReviewKind::Learning`] review and every later answered row is a
-//! [`ReviewKind::Review`], as the benchmark treats them.
+//! `state` is Anki's review kind shifted up by one, with the start of a card's last learning run
+//! set to 0 (the dataset builder, `build_parquet.py` in open-spaced-repetition/
+//! anki-revlogs-dataset-builder): 0 first learn, 1 learning step, 2 review, 3 relearning, 4 a
+//! filtered-deck review that rescheduled. The card says 0–3; real files have 4s too. Like the
+//! Anki reader, a rescheduling filtered review counts as a review. The builder already dropped
+//! manual reschedules, cram that didn't reschedule, and each card's history before its last
+//! reset.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use parquet::errors::ParquetError;
@@ -38,6 +39,7 @@ pub enum Revlogs10kError {
 const CARD: &str = "card_id";
 const DAY: &str = "day_offset";
 const RATING: &str = "rating";
+const STATE: &str = "state";
 const DURATION: &str = "duration";
 
 /// Read one user's review log, oldest first.
@@ -62,14 +64,14 @@ pub fn load(path: &Path) -> Result<Vec<LoggedReview>, Revlogs10kError> {
             .position(|n| n == name)
             .ok_or(Revlogs10kError::MissingColumn(name))
     };
-    let (card, day, rating, duration) = (
+    let (card, day, rating, state, duration) = (
         column(CARD)?,
         column(DAY)?,
         column(RATING)?,
+        column(STATE)?,
         column(DURATION)?,
     );
 
-    let mut seen = HashSet::new();
     let mut reviews: Vec<LoggedReview> = Vec::new();
     for (row, fields) in reader.get_row_iter(None).map_err(parquet)?.enumerate() {
         let fields = fields.map_err(parquet)?.into_columns();
@@ -86,17 +88,19 @@ pub fn load(path: &Path) -> Result<Vec<LoggedReview>, Revlogs10kError> {
         }
         let rating = u8::try_from(int(rating, RATING)?)
             .ok()
-            .filter(|r| *r <= 4)
+            .filter(|r| (1..=4).contains(r))
             .ok_or(Revlogs10kError::NotAnInteger {
                 row,
                 column: RATING,
             })?;
-        let kind = if rating == 0 {
-            ReviewKind::Manual
-        } else if seen.insert(card_id) {
-            ReviewKind::Learning
-        } else {
-            ReviewKind::Review
+        let kind = match int(state, STATE)? {
+            0 | 1 => ReviewKind::Learning,
+            2 => ReviewKind::Review,
+            3 => ReviewKind::Relearning,
+            4 => ReviewKind::Review,
+            _ => {
+                return Err(Revlogs10kError::NotAnInteger { row, column: STATE });
+            }
         };
         reviews.push(LoggedReview {
             card_id,
