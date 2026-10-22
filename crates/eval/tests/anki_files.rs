@@ -3,11 +3,20 @@
 use std::io::Write;
 use std::path::Path;
 
-use eval::ReviewKind;
-use eval::anki::load;
+use eval::anki;
+use eval::{DayClock, ReviewKind};
+use jiff::tz::TimeZone;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, SqliteConnection};
 use zip::write::SimpleFileOptions;
+
+async fn load(path: &Path) -> Result<anki::Collection, anki::AnkiError> {
+    let clock = DayClock {
+        tz: TimeZone::UTC,
+        rollover_hour: 4,
+    };
+    anki::load(path, &clock).await
+}
 
 const REVLOG: &str =
     "CREATE TABLE revlog (id INTEGER PRIMARY KEY, cid INTEGER, usn INTEGER, ease INTEGER,

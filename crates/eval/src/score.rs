@@ -63,13 +63,16 @@ pub struct Bucket {
     pub actual: f64,
 }
 
-/// Slice `test` by how many cards were introduced on the card's first day (`edges` are the
-/// lower bounds of each slice, ascending). This is the binge question: do cards learned in a
-/// big batch fade faster than the model expects?
-pub fn by_intake(
+/// Slice `test` by `key` (`edges` are the lower bounds of each slice, ascending) and compare
+/// predicted with actual recall in each. Keyed by [`Sample::new_that_day`], this is the binge
+/// question: do cards learned in a big batch fade faster than the model expects? Keyed by
+/// [`Sample::reviews_that_day`] or [`Sample::nth_that_day`], it's the load question: is recall
+/// worse on heavy days, or late in a long session?
+pub fn recall_by(
     parameters: &[f32],
     test: &[Sample],
     edges: &[u32],
+    key: impl Fn(&Sample) -> u32,
 ) -> Result<Vec<Bucket>, FSRSError> {
     let fsrs = FSRS::new(parameters)?;
     let decay = parameters
@@ -94,7 +97,7 @@ pub fn by_intake(
         })
         .collect();
     for s in test {
-        let Some(i) = edges.iter().rposition(|lo| s.new_that_day >= *lo) else {
+        let Some(i) = edges.iter().rposition(|lo| key(s) >= *lo) else {
             continue;
         };
         let b = &mut buckets[i];

@@ -1,9 +1,8 @@
 //! A synthetic learner whose memory follows FSRS's default model, optionally with a planted
 //! weakness, reviewing on FSRS's own schedule. Test data with a known answer.
 
-use eval::{LoggedReview, ReviewKind};
+use eval::{LearningDay, LoggedReview, ReviewKind};
 use fsrs::{DEFAULT_PARAMETERS, FSRS, MemoryState, current_retrievability};
-use jiff::Timestamp;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -12,6 +11,10 @@ pub struct Learner {
     pub binge_at: u32,
     /// ...really have this share of the stability the model thinks they have.
     pub binge_stability: f32,
+    /// Reviews after this many in one day...
+    pub tired_after: u32,
+    /// ...are recalled with this share of the chance the model gives them.
+    pub tired_recall: f32,
 }
 
 impl Learner {
@@ -19,6 +22,8 @@ impl Learner {
         Learner {
             binge_at: u32::MAX,
             binge_stability: 1.0,
+            tired_after: u32::MAX,
+            tired_recall: 1.0,
         }
     }
 }
@@ -29,10 +34,6 @@ struct Card {
     last_day: i64,
     due_day: i64,
     true_share: f32,
-}
-
-pub fn at(day: i64, nth: i64) -> Timestamp {
-    Timestamp::from_second(day * 86_400 + 12 * 3600 + nth).unwrap()
 }
 
 /// `new_on(day)` cards are introduced each day for `days` days; every due card is reviewed.
@@ -48,19 +49,22 @@ pub fn simulate(
     let mut cards: Vec<Card> = Vec::new();
     let mut log = Vec::new();
     for day in 0..days {
-        let mut nth = 0;
-        let stamp = |nth: &mut i64| {
-            *nth += 1;
-            at(day, *nth)
-        };
+        let today = LearningDay(day as i32);
+        let mut done_today = 0;
         for c in cards.iter_mut().filter(|c| c.due_day <= day) {
+            done_today += 1;
+            let tired = if done_today > learner.tired_after {
+                learner.tired_recall
+            } else {
+                1.0
+            };
             let elapsed = (day - c.last_day) as u32;
             let truth = MemoryState {
                 stability: c.memory.stability * c.true_share,
                 ..c.memory
             };
             let recalled =
-                rng.random::<f32>() < current_retrievability(truth, elapsed as f32, decay);
+                rng.random::<f32>() < tired * current_retrievability(truth, elapsed as f32, decay);
             let next = fsrs.next_states(Some(c.memory), 0.9, elapsed).unwrap();
             let (state, rating) = if recalled {
                 (next.good, 3)
@@ -77,7 +81,7 @@ pub fn simulate(
                 };
             log.push(LoggedReview {
                 card_id: c.id,
-                at: stamp(&mut nth),
+                day: today,
                 rating,
                 kind: ReviewKind::Review,
                 duration_ms: 4000,
@@ -94,7 +98,7 @@ pub fn simulate(
             let first = fsrs.next_states(None, 0.9, 0).unwrap().good;
             log.push(LoggedReview {
                 card_id: id,
-                at: stamp(&mut nth),
+                day: today,
                 rating: 3,
                 kind: ReviewKind::Learning,
                 duration_ms: 6000,
