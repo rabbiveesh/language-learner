@@ -9,6 +9,12 @@ pub enum ApiError {
     NotFound,
     #[error("{0}")]
     BadRequest(String),
+    #[error("sign in first")]
+    Unauthorized,
+    #[error("{0}")]
+    Forbidden(String),
+    #[error("the passkey check failed: {0}")]
+    Passkey(#[from] webauthn_rs::prelude::WebauthnError),
     #[error(transparent)]
     Db(#[from] sqlx::Error),
     #[error(transparent)]
@@ -21,7 +27,9 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match &self {
             ApiError::NotFound => StatusCode::NOT_FOUND,
-            ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            ApiError::BadRequest(_) | ApiError::Passkey(_) => StatusCode::BAD_REQUEST,
+            ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::Forbidden(_) => StatusCode::FORBIDDEN,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         if status.is_server_error() {

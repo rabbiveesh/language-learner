@@ -1,0 +1,10 @@
+# Continuous backup of the SQLite database to a Tigris bucket (`fly storage create` sets
+# BUCKET_NAME and the AWS_* credentials as secrets).
+dbs:
+  - path: /data/fala.db
+    replicas:
+      - type: s3
+        bucket: ${BUCKET_NAME}
+        path: fala.db
+        endpoint: ${AWS_ENDPOINT_URL_S3}
+        region: auto

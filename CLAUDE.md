@@ -1,4 +1,4 @@
-# Language Learner
+# Fala
 
 A personal Fluent Forever–style language app: words with pictures and native audio, studied with a
 built-in spaced-repetition scheduler (FSRS) and an adaptive engine that keeps practice at the right
@@ -29,7 +29,7 @@ tests and lints.
   modesty filter.
 - `crates/server`: axum + SQLite (sqlx). The only place with I/O, secrets and API keys.
 - `web/`: Vue 3 + TypeScript, Vite, Nuxt UI (Tailwind v4), Pinia, vue-router, Vitest.
-- Hosting: Fly, CPU only. Anything that needs a GPU (training the phoneme model) runs on Veesh's
+- Hosting: Fly at fala.veesh.me (docs/deploy.md), CPU only. Anything that needs a GPU (training the phoneme model) runs on Veesh's
   machine, and only the weights ship.
 - Claude API: Veesh's plan includes monthly API credits, so prefer Anthropic models (Haiku-class)
   for glosses, picture checks, grading free sentences and generating grammar sentences. Everything

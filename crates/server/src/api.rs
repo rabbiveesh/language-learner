@@ -8,16 +8,23 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::AppState;
 use crate::error::ApiError;
 use crate::store;
+use crate::{AppState, auth};
 
-pub fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/health", get(|| async { "ok" }))
+pub fn routes(state: AppState) -> Router<AppState> {
+    let learner = Router::new()
         .route("/due", get(due))
         .route("/reviews", post(review))
         .route("/notes", post(new_word_note))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state,
+            auth::require_session,
+        ));
+    Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .nest("/auth", auth::routes())
+        .merge(learner)
 }
 
 /// A card ready to study, with what it needs to render.

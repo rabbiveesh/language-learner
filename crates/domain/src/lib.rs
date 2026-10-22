@@ -1,4 +1,4 @@
-//! Language Learner's domain: what a learner studies (notes), how it's asked (cards), what
+//! Fala's domain: what a learner studies (notes), how it's asked (cards), what
 //! happened (the append-only review log), how answers are graded, and when cards come back
 //! (FSRS). Pure: no I/O, no clock. Callers pass timestamps in.
 

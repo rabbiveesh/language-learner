@@ -1,39 +1,13 @@
 //! The API end to end, against an in-memory database.
 
-use std::path::Path;
+mod common;
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use http_body_util::BodyExt;
+use axum::http::StatusCode;
+use common::Client;
 use serde_json::{Value, json};
-use server::{Config, app, connect};
-use tower::ServiceExt;
 
-async fn test_app() -> Router {
-    let config = Config {
-        database_url: "sqlite::memory:".into(),
-        port: 0,
-        web_dist: "does-not-exist".into(),
-    };
-    app(connect(&config).await.unwrap(), Path::new("does-not-exist"))
-}
-
-async fn call(app: &Router, method: &str, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
-    let req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header("content-type", "application/json");
-    let req = req
-        .body(body.map_or(Body::empty(), |b| Body::from(b.to_string())))
-        .unwrap();
-    let res = app.clone().oneshot(req).await.unwrap();
-    let status = res.status();
-    let bytes = res.into_body().collect().await.unwrap().to_bytes();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
+async fn call(c: &mut Client, method: &str, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
+    c.call(method, uri, body).await
 }
 
 fn copo() -> Value {
@@ -48,18 +22,17 @@ fn copo() -> Value {
 
 #[tokio::test]
 async fn health_answers() {
-    let app = test_app().await;
-    let res = app
-        .oneshot(Request::get("/api/health").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+    let mut signed_out = Client::new().await;
+    assert_eq!(
+        call(&mut signed_out, "GET", "/api/health", None).await.0,
+        StatusCode::OK
+    );
 }
 
 #[tokio::test]
 async fn a_new_word_with_a_picture_gets_picture_cards_and_they_show_up_as_new() {
-    let app = test_app().await;
-    let (status, created) = call(&app, "POST", "/api/notes", Some(copo())).await;
+    let mut app = Client::signed_in().await;
+    let (status, created) = call(&mut app, "POST", "/api/notes", Some(copo())).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         created["cards"].as_array().unwrap().len(),
@@ -67,7 +40,7 @@ async fn a_new_word_with_a_picture_gets_picture_cards_and_they_show_up_as_new() 
         "picture→word, word→picture, speaking"
     );
 
-    let (_, due) = call(&app, "GET", "/api/due", None).await;
+    let (_, due) = call(&mut app, "GET", "/api/due", None).await;
     assert_eq!(due.as_array().unwrap().len(), 3);
     assert!(
         due[0]["state"]["due"].is_null(),
@@ -77,12 +50,12 @@ async fn a_new_word_with_a_picture_gets_picture_cards_and_they_show_up_as_new() 
 
 #[tokio::test]
 async fn remembering_a_card_takes_it_off_todays_list() {
-    let app = test_app().await;
-    let (_, created) = call(&app, "POST", "/api/notes", Some(copo())).await;
+    let mut app = Client::signed_in().await;
+    let (_, created) = call(&mut app, "POST", "/api/notes", Some(copo())).await;
     let card_id = created["cards"][0]["id"].clone();
 
     let (status, state) = call(
-        &app,
+        &mut app,
         "POST",
         "/api/reviews",
         Some(json!({ "card_id": card_id, "grade": "Good" })),
@@ -91,7 +64,7 @@ async fn remembering_a_card_takes_it_off_todays_list() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(state["reps"], 1);
 
-    let (_, due) = call(&app, "GET", "/api/due", None).await;
+    let (_, due) = call(&mut app, "GET", "/api/due", None).await;
     assert!(
         due.as_array()
             .unwrap()
@@ -102,9 +75,9 @@ async fn remembering_a_card_takes_it_off_todays_list() {
 
 #[tokio::test]
 async fn reviewing_a_card_that_doesnt_exist_is_a_404() {
-    let app = test_app().await;
+    let mut app = Client::signed_in().await;
     let (status, body) = call(
-        &app,
+        &mut app,
         "POST",
         "/api/reviews",
         Some(json!({ "card_id": 99, "grade": "Good" })),
@@ -116,9 +89,9 @@ async fn reviewing_a_card_that_doesnt_exist_is_a_404() {
 
 #[tokio::test]
 async fn a_word_needs_a_spelling() {
-    let app = test_app().await;
+    let mut app = Client::signed_in().await;
     let mut word = copo();
     word["word"]["spelling"] = json!("  ");
-    let (status, _) = call(&app, "POST", "/api/notes", Some(word)).await;
+    let (status, _) = call(&mut app, "POST", "/api/notes", Some(word)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
