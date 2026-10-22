@@ -1,9 +1,8 @@
 //! A synthetic learner whose memory follows FSRS's default model, optionally with a planted
 //! weakness, reviewing on FSRS's own schedule. Test data with a known answer.
 
-use eval::{LoggedReview, ReviewKind};
+use eval::{LearningDay, LoggedReview, ReviewKind};
 use fsrs::{DEFAULT_PARAMETERS, FSRS, MemoryState, current_retrievability};
-use jiff::Timestamp;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -31,10 +30,6 @@ struct Card {
     true_share: f32,
 }
 
-pub fn at(day: i64, nth: i64) -> Timestamp {
-    Timestamp::from_second(day * 86_400 + 12 * 3600 + nth).unwrap()
-}
-
 /// `new_on(day)` cards are introduced each day for `days` days; every due card is reviewed.
 pub fn simulate(
     learner: &Learner,
@@ -48,11 +43,7 @@ pub fn simulate(
     let mut cards: Vec<Card> = Vec::new();
     let mut log = Vec::new();
     for day in 0..days {
-        let mut nth = 0;
-        let stamp = |nth: &mut i64| {
-            *nth += 1;
-            at(day, *nth)
-        };
+        let today = LearningDay(day as i32);
         for c in cards.iter_mut().filter(|c| c.due_day <= day) {
             let elapsed = (day - c.last_day) as u32;
             let truth = MemoryState {
@@ -77,7 +68,7 @@ pub fn simulate(
                 };
             log.push(LoggedReview {
                 card_id: c.id,
-                at: stamp(&mut nth),
+                day: today,
                 rating,
                 kind: ReviewKind::Review,
                 duration_ms: 4000,
@@ -94,7 +85,7 @@ pub fn simulate(
             let first = fsrs.next_states(None, 0.9, 0).unwrap().good;
             log.push(LoggedReview {
                 card_id: id,
-                at: stamp(&mut nth),
+                day: today,
                 rating: 3,
                 kind: ReviewKind::Learning,
                 duration_ms: 6000,

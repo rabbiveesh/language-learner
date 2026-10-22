@@ -1,5 +1,6 @@
 //! `cargo run -p eval -- <collection> [--deck NAME]`: score scheduler variants on your own
-//! review history. See the crate docs for what this can and can't tell you.
+//! review history, or on one user of the FSRS dataset (`.../user_id=N/data.parquet`). See the
+//! crate docs for what this can and can't tell you.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -11,15 +12,18 @@ use jiff::tz::TimeZone;
 #[derive(Parser)]
 #[command(about = "Score scheduler variants on a real review history")]
 struct Args {
-    /// An Anki export (.colpkg, .apkg) or a bare collection file.
+    /// An Anki export (.colpkg, .apkg), a bare collection file, or a revlogs `.parquet` file
+    /// from anki-revlogs-10k.
     collection: PathBuf,
-    /// Only cards whose deck name contains this (case-insensitive), e.g. "japanese".
+    /// Only cards whose deck name contains this (case-insensitive), e.g. "japanese". Anki
+    /// collections only: the dataset has no deck names.
     #[arg(long)]
     deck: Option<String>,
-    /// Time zone the reviews were done in (default: this machine's).
+    /// Time zone the reviews were done in (default: this machine's). Anki collections only: the
+    /// dataset's days are already local.
     #[arg(long)]
     tz: Option<String>,
-    /// Hour the learning day rolls over.
+    /// Hour the learning day rolls over. Anki collections only.
     #[arg(long, default_value_t = 4)]
     rollover: i8,
     /// Share of the newest reviews held out for testing.
@@ -54,12 +58,19 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         rollover_hour: args.rollover,
     };
 
-    let collection = eval::anki::load(&args.collection).await?;
-    let reviews = match &args.deck {
-        Some(d) => collection.in_deck(d),
-        None => collection.reviews.clone(),
+    let reviews = if args.collection.extension().is_some_and(|e| e == "parquet") {
+        if args.deck.is_some() {
+            return Err("--deck needs an Anki collection; the dataset has no deck names".into());
+        }
+        eval::revlogs_10k::load(&args.collection)?
+    } else {
+        let collection = eval::anki::load(&args.collection, &clock).await?;
+        match &args.deck {
+            Some(d) => collection.in_deck(d),
+            None => collection.reviews,
+        }
     };
-    let all = samples(&reviews, &clock);
+    let all = samples(&reviews);
     let split = split_by_time(all, args.test_fraction);
     let (Some(first_test), Some(last)) = (split.test.first(), split.test.last()) else {
         return Err("not enough reviews to hold any out for testing".into());
@@ -71,9 +82,8 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         split.test.len()
     );
     println!(
-        "test window: {} → {}\n",
-        first_test.at.strftime("%F"),
-        last.at.strftime("%F")
+        "test window: the last {} learning days\n",
+        last.day - first_test.day + 1
     );
 
     let mut variants: Vec<(&str, Vec<f32>)> = vec![("FSRS defaults", Vec::new())];

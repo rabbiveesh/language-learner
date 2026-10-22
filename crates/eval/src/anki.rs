@@ -12,7 +12,7 @@ use jiff::Timestamp;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, Row, SqliteConnection};
 
-use crate::history::{LoggedReview, ReviewKind};
+use crate::history::{DayClock, LoggedReview, ReviewKind};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AnkiError {
@@ -55,8 +55,9 @@ impl Collection {
     }
 }
 
-/// Read a collection from an export or a bare collection file.
-pub async fn load(path: &Path) -> Result<Collection, AnkiError> {
+/// Read a collection from an export or a bare collection file. Anki logs reviews by timestamp,
+/// so `clock` says which learning day each one falls on.
+pub async fn load(path: &Path, clock: &DayClock) -> Result<Collection, AnkiError> {
     let io = |source| AnkiError::Io {
         path: path.to_owned(),
         source,
@@ -65,10 +66,10 @@ pub async fn load(path: &Path) -> Result<Collection, AnkiError> {
     let mut magic = [0u8; 4];
     file.read_exact(&mut magic).map_err(io)?;
     if &magic != b"PK\x03\x04" {
-        return read_db(path).await;
+        return read_db(path, clock).await;
     }
     let db = unpack(std::fs::File::open(path).map_err(io)?)?;
-    read_db(db.path()).await
+    read_db(db.path(), clock).await
 }
 
 /// Copy the newest collection format in the zip out to a temp file.
@@ -99,7 +100,7 @@ fn unpack(file: std::fs::File) -> Result<tempfile::NamedTempFile, AnkiError> {
     Err(AnkiError::NoCollection)
 }
 
-async fn read_db(path: &Path) -> Result<Collection, AnkiError> {
+async fn read_db(path: &Path, clock: &DayClock) -> Result<Collection, AnkiError> {
     let mut db =
         SqliteConnection::connect_with(&SqliteConnectOptions::new().filename(path).read_only(true))
             .await?;
@@ -124,7 +125,7 @@ async fn read_db(path: &Path) -> Result<Collection, AnkiError> {
         };
         reviews.push(LoggedReview {
             card_id: r.try_get("cid")?,
-            at,
+            day: clock.day(at),
             rating: ease.clamp(0, 4) as u8,
             kind,
             duration_ms: r.try_get::<i64, _>("time")?.clamp(0, i64::from(u32::MAX)) as u32,

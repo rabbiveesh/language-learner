@@ -21,11 +21,25 @@ pub enum ReviewKind {
     Manual,
 }
 
-/// One review from any source, in a source-neutral shape.
+/// A learning day, counted from an origin the source picks (the Unix epoch for an Anki
+/// collection, the collection's first day for the FSRS dataset). Only differences between days
+/// mean anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LearningDay(pub i32);
+
+impl std::ops::Sub for LearningDay {
+    type Output = i32;
+    fn sub(self, earlier: Self) -> i32 {
+        self.0 - earlier.0
+    }
+}
+
+/// One review from any source, in a source-neutral shape. A review log is a slice of these,
+/// oldest first: within a day, the order of the slice is the order the reviews happened in.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoggedReview {
     pub card_id: i64,
-    pub at: Timestamp,
+    pub day: LearningDay,
     /// 1 = again … 4 = easy.
     pub rating: u8,
     pub kind: ReviewKind,
@@ -41,9 +55,10 @@ pub struct DayClock {
 }
 
 impl DayClock {
-    pub fn day(&self, at: Timestamp) -> Date {
+    pub fn day(&self, at: Timestamp) -> LearningDay {
         let shifted = at - jiff::SignedDuration::from_hours(i64::from(self.rollover_hour));
-        shifted.to_zoned(self.tz.clone()).date()
+        let date = shifted.to_zoned(self.tz.clone()).date();
+        LearningDay((date - Date::constant(1970, 1, 1)).get_days())
     }
 }
 
@@ -52,7 +67,7 @@ impl DayClock {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sample {
     pub card_id: i64,
-    pub at: Timestamp,
+    pub day: LearningDay,
     pub item: FSRSItem,
     /// Cards introduced on the day this card was introduced, itself included.
     pub new_that_day: u32,
@@ -64,71 +79,74 @@ impl Sample {
     }
 }
 
-/// Turn a review log into prediction targets, oldest first.
+/// Turn a review log (oldest first) into prediction targets, oldest first.
 ///
 /// The same rules as fsrs-rs's own Anki converter (not exported, so ported here): manual
 /// reschedules and cram reviews are dropped, each card's history starts at its last first-learn
 /// (a reset card starts over), elapsed time is counted in learning days, and same-day reviews
 /// are history but never targets.
-pub fn samples(reviews: &[LoggedReview], clock: &DayClock) -> Vec<Sample> {
-    let mut by_card: BTreeMap<i64, Vec<&LoggedReview>> = BTreeMap::new();
-    for r in reviews
-        .iter()
-        .filter(|r| r.kind != ReviewKind::Manual && r.kind != ReviewKind::Filtered && r.rating > 0)
-    {
-        by_card.entry(r.card_id).or_default().push(r);
+pub fn samples(reviews: &[LoggedReview]) -> Vec<Sample> {
+    // Each review keeps its place in the log, so targets come out in the order they happened.
+    let mut by_card: BTreeMap<i64, Vec<(usize, &LoggedReview)>> = BTreeMap::new();
+    for (i, r) in reviews.iter().enumerate().filter(|(_, r)| {
+        r.kind != ReviewKind::Manual && r.kind != ReviewKind::Filtered && r.rating > 0
+    }) {
+        by_card.entry(r.card_id).or_default().push((i, r));
     }
-    let histories: Vec<(i64, Vec<&LoggedReview>)> = by_card
+    let histories: Vec<(i64, Vec<(usize, &LoggedReview)>)> = by_card
         .into_iter()
         .filter_map(|(card, mut rs)| {
-            rs.sort_by_key(|r| r.at);
             let start = last_first_learn(&rs)?;
             Some((card, rs.split_off(start)))
         })
         .collect();
 
-    let mut intake: HashMap<Date, u32> = HashMap::new();
+    let mut intake: HashMap<LearningDay, u32> = HashMap::new();
     for (_, rs) in &histories {
-        *intake.entry(clock.day(rs[0].at)).or_default() += 1;
+        *intake.entry(rs[0].1.day).or_default() += 1;
     }
 
     let mut out = Vec::new();
     for (card, rs) in histories {
-        let new_that_day = intake[&clock.day(rs[0].at)];
+        let new_that_day = intake[&rs[0].1.day];
         let mut reviews = vec![FSRSReview {
-            rating: u32::from(rs[0].rating),
+            rating: u32::from(rs[0].1.rating),
             delta_t: 0,
         }];
         for pair in rs.windows(2) {
-            let delta_t = (clock.day(pair[1].at) - clock.day(pair[0].at))
-                .get_days()
-                .max(0) as u32;
+            let ((_, prev), (i, this)) = (pair[0], pair[1]);
+            let delta_t = (this.day - prev.day).max(0) as u32;
             reviews.push(FSRSReview {
-                rating: u32::from(pair[1].rating),
+                rating: u32::from(this.rating),
                 delta_t,
             });
             if delta_t > 0 {
-                out.push(Sample {
-                    card_id: card,
-                    at: pair[1].at,
-                    item: FSRSItem {
-                        reviews: reviews.clone(),
+                out.push((
+                    i,
+                    Sample {
+                        card_id: card,
+                        day: this.day,
+                        item: FSRSItem {
+                            reviews: reviews.clone(),
+                        },
+                        new_that_day,
                     },
-                    new_that_day,
-                });
+                ));
             }
         }
     }
-    out.sort_by_key(|s| s.at);
-    out
+    out.sort_by_key(|(i, _)| *i);
+    out.into_iter().map(|(_, s)| s).collect()
 }
 
 /// Index of the first review of the card's last run of learning reviews, if it has one.
-fn last_first_learn(rs: &[&LoggedReview]) -> Option<usize> {
-    let last_learn = rs.iter().rposition(|r| r.kind == ReviewKind::Learning)?;
+fn last_first_learn(rs: &[(usize, &LoggedReview)]) -> Option<usize> {
+    let last_learn = rs
+        .iter()
+        .rposition(|(_, r)| r.kind == ReviewKind::Learning)?;
     let start = rs[..=last_learn]
         .iter()
-        .rposition(|r| r.kind != ReviewKind::Learning)
+        .rposition(|(_, r)| r.kind != ReviewKind::Learning)
         .map_or(0, |i| i + 1);
     Some(start)
 }
@@ -151,7 +169,7 @@ mod tests {
     fn review(card: i64, at: Timestamp, rating: u8, kind: ReviewKind) -> LoggedReview {
         LoggedReview {
             card_id: card,
-            at,
+            day: clock().day(at),
             rating,
             kind,
             duration_ms: 3000,
@@ -176,7 +194,7 @@ mod tests {
             ),
             review(1, at(2, 10), 3, ReviewKind::Review),
         ];
-        let s = samples(&log, &clock());
+        let s = samples(&log);
         assert_eq!(s.len(), 1);
         let deltas: Vec<u32> = s[0].item.reviews.iter().map(|r| r.delta_t).collect();
         assert_eq!(deltas, [0, 0, 2]);
@@ -192,7 +210,7 @@ mod tests {
             review(1, at(5, 10), 3, ReviewKind::Learning),
             review(1, at(8, 10), 3, ReviewKind::Review),
         ];
-        let s = samples(&log, &clock());
+        let s = samples(&log);
         assert_eq!(s.len(), 1);
         assert_eq!(
             s[0].item.reviews.len(),
@@ -210,9 +228,21 @@ mod tests {
         }
         log.push(review(9, at(5, 10), 3, ReviewKind::Learning));
         log.push(review(9, at(6, 10), 3, ReviewKind::Review));
-        let s = samples(&log, &clock());
+        let s = samples(&log);
         assert_eq!(s.iter().filter(|s| s.new_that_day == 3).count(), 3);
         assert_eq!(s.iter().find(|s| s.card_id == 9).unwrap().new_that_day, 1);
+    }
+
+    #[test]
+    fn targets_on_the_same_day_keep_the_order_they_were_reviewed_in() {
+        let log = [
+            review(2, at(0, 10), 3, ReviewKind::Learning),
+            review(1, at(0, 11), 3, ReviewKind::Learning),
+            review(2, at(3, 10), 3, ReviewKind::Review),
+            review(1, at(3, 11), 1, ReviewKind::Review),
+        ];
+        let cards: Vec<i64> = samples(&log).iter().map(|s| s.card_id).collect();
+        assert_eq!(cards, [2, 1]);
     }
 
     #[test]
@@ -221,6 +251,6 @@ mod tests {
             review(1, at(0, 10), 3, ReviewKind::Review),
             review(1, at(3, 10), 3, ReviewKind::Review),
         ];
-        assert!(samples(&log, &clock()).is_empty());
+        assert!(samples(&log).is_empty());
     }
 }

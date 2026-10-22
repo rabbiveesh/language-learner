@@ -3,21 +3,13 @@
 mod common;
 
 use common::{Learner, simulate};
-use eval::{DayClock, by_intake, samples, score, split_by_time};
+use eval::{by_intake, samples, score, split_by_time};
 use fsrs::DEFAULT_PARAMETERS;
-use jiff::tz::TimeZone;
-
-fn clock() -> DayClock {
-    DayClock {
-        tz: TimeZone::UTC,
-        rollover_hour: 4,
-    }
-}
 
 #[test]
 fn the_true_model_scores_better_than_a_wrong_one() {
     let log = simulate(&Learner::average(), 150, |_| 8, 1);
-    let split = split_by_time(samples(&log, &clock()), 0.2);
+    let split = split_by_time(samples(&log), 0.2);
     assert!(
         split.test.len() > 500,
         "enough targets to judge: {}",
@@ -41,7 +33,7 @@ fn a_planted_binge_effect_shows_up_as_a_gap_on_big_intake_days() {
         binge_stability: 0.25,
     };
     let log = simulate(&binger, 150, |day| if day % 7 == 0 { 50 } else { 4 }, 2);
-    let split = split_by_time(samples(&log, &clock()), 0.3);
+    let split = split_by_time(samples(&log), 0.3);
 
     let buckets = by_intake(&[], &split.test, &[1, 40]).unwrap();
     let (calm, binge) = (&buckets[0], &buckets[1]);
@@ -63,7 +55,7 @@ fn no_planted_effect_means_no_gap() {
         |day| if day % 7 == 0 { 50 } else { 4 },
         3,
     );
-    let split = split_by_time(samples(&log, &clock()), 0.3);
+    let split = split_by_time(samples(&log), 0.3);
     for b in by_intake(&[], &split.test, &[1, 40]).unwrap() {
         assert!((b.actual - b.predicted).abs() < 0.05, "{b:?}");
     }

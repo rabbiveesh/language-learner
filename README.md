@@ -13,7 +13,7 @@ native-speaker audio, and spaced repetition built in. Brazilian Portuguese first
 | `crates/domain` | Notes, cards, review log, typed-answer grading, FSRS scheduling |
 | `crates/adapt` | Adaptive difficulty engine (generic, from the games) |
 | `crates/media` | Picture / audio / dictionary sources and the modesty filter |
-| `crates/eval` | Scores scheduler variants on a real review history (an Anki export) |
+| `crates/eval` | Scores scheduler variants on a real review history (an Anki export, or a user from the FSRS dataset) |
 | `crates/server` | axum + SQLite API, serves the built web app |
 | `web/` | Vue 3 + Nuxt UI front end |
 | `config/` | Plain-text configuration (the picture standard) |
@@ -34,6 +34,14 @@ To score scheduling ideas on your own history:
 
 ```sh
 cargo run --release -p eval -- collection.colpkg --deck portuguese
+```
+
+Or on other people's: one user's `revlogs/user_id=N/data.parquet` from the FSRS project's
+[anki-revlogs-10k](https://huggingface.co/datasets/open-spaced-repetition/anki-revlogs-10k)
+dataset (gated: accept its terms, then download with a Hugging Face token).
+
+```sh
+cargo run --release -p eval -- revlogs/user_id=1/data.parquet
 ```
 
 Use npm 11 or later (Node 24); npm 10 trips over a peer dependency in jsdom.
